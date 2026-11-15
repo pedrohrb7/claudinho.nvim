@@ -17,9 +17,9 @@ Atualizado em 2026-11-15.
 - Agente de stack Lua: `lua` (`~/.claude/agents/lua.md`); a spec foi ajustada para esse nome em 2026-11-14.
 - Ambiente local: plenary.nvim instalado em `~/.local/share/nvim/site/pack/vendor/start/plenary.nvim`, no SHA do CI (`74b06c6c75e4eeb3108ec01852001636d85a932b`).
 
-## Fork limpo: implementado (2026-11-15)
+## Fork limpo: completo (2026-11-15)
 
-Tasks 1-13 feitas (detalhe em `docs/features/fork-limpo/log.md`):
+Tasks 1-14 feitas (detalhe em `docs/features/fork-limpo/log.md`):
 
 - renomeado pro namespace `claudinho`;
 - opções do snacks e legadas removidas, com aviso;
@@ -30,12 +30,12 @@ Tasks 1-13 feitas (detalhe em `docs/features/fork-limpo/log.md`):
 
 Gate final: unit 1630/0/0/28, integração 508 no 0.12.3 e no 0.12.0, cobertura 86,22%.
 
-Git recomeçado (Task 14, passos 1-4): novo commit raiz `64f1422`, backup em `~/backups/claudecode-history.bundle`, saída da rede de forks do GitHub, remoto só com `main`.
+Git recomeçado (Task 14, fechada pelo usuário em 2026-11-15 com o push de `892bacc`, CI em andamento): novo commit raiz `64f1422`, backup em `~/backups/claudecode-history.bundle`, saída da rede de forks do GitHub, remoto só com `main`.
 
-## Pendente (Task 14, passo 5)
+## Pendente (follow-ups do usuário)
 
-1. CI verde no novo commit.
-2. Regras de branch que exigiam `covered-lock` e `pr-title`: revisar.
+1. Confirmar o resultado do CI em `892bacc`.
+2. Ajustar as regras de branch que exigiam `covered-lock` e `pr-title`.
 3. Reinstalar o plugin na config do Neovim (o clone antigo do `vim.pack` não avança pro `main` reescrito).
 4. Tag `v0.1.0`, só com autorização do usuário (o `CHANGELOG.md` linka pra ela).
 

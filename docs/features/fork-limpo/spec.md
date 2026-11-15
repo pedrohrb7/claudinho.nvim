@@ -1,7 +1,7 @@
 # Fase 0 · Fork limpo - spec técnica
 
 - **Date:** 2026-11-12
-- **Status:** In progress
+- **Status:** Implemented
 - **Approved:** 2026-11-14, pelo usuário, mantendo a integração local no Neovim 0.12.0 e no 0.12.3 (Task 13)
 - **Addendum 2026-11-14:** o agente de stack das Tasks 2 a 8 se chama `lua`, não `lua-neovim`. Só o nome muda; nenhuma task muda de escopo.
 - **Addendum 2026-11-15:** a guarda contra o claudecode.nvim também o detecta pelo runtimepath, e o `:checkhealth` reporta o conflito; ver o adendo no fim da [seção 6](#6-guarda-contra-o-claudecodenvim-task-7).
@@ -565,7 +565,7 @@ Stacks: `lua` (Tasks 2 a 8) fica fora da lista do template, pela pré-condição
 - **Files:** nenhum (operações de git e no GitHub)
 - **Depends on:** Task 13
 - **Done when:** o usuário rodou o fluxo da regra 40 (ver "Recomeço do git" na Verificação), passo a passo e com autorização em cada um, ou decidiu não rodá-lo; a decisão está no log e num adendo datado desta spec. Com o fluxo rodado: `git log` com um commit só, o remoto sem branches nem tags do upstream, e o CI verde no commit novo
-- **Status:** pending
+- **Status:** done
 
 ## Verification
 

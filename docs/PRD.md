@@ -112,7 +112,7 @@ Fase 0 · Fork limpo (detalhe no plano):
 - [x] `README.md` (pt-BR) e `README.en.md` novos, `CLAUDE.md` curto, `CHANGELOG.md` novo, `LICENSE` com a linha do autor do fork
 - [x] `VERSION` em `0.1.0`
 - [x] Testes verdes
-- [x] Recomeço do git e desvínculo no GitHub, só com autorização a cada passo (passo 5, CI e regras de branch, pendente em 2026-11-15)
+- [x] Recomeço do git e desvínculo no GitHub, só com autorização a cada passo (feito em 2026-11-15)
 
 Fase 1 · Janela do terminal, Fase 5 · Comandos e parte da Fase 3 (status): plano da UI base. A fundação técnica (`events.lua`, `sources/ide_protocol.lua`, interfaces de `ui/adapters` com implementação nativa) entra quando e como a spec da UI base decidir.
 
