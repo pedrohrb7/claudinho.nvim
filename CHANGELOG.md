@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Claudinho.nvim is a hard fork of [claudecode.nvim](https://github.com/coder/claudecode.nvim), taken at [commit d123707](https://github.com/coder/claudecode.nvim/commit/d1237072eb7c55f97b2d3c44b7971546edad0238). The upstream history is not carried over.
 
+## [Unreleased]
+
 ## [0.1.0] - 2026-11-15
 
 ### Changed
@@ -31,4 +33,5 @@ Claudinho.nvim is a hard fork of [claudecode.nvim](https://github.com/coder/clau
 - `diff_opts.auto_close_on_accept` and `diff_opts.show_diff_stats`: they had no effect.
 - `queue_timeout`: it had no effect.
 
+[Unreleased]: https://github.com/pedrohrb7/claudinho.nvim/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/pedrohrb7/claudinho.nvim/releases/tag/v0.1.0

@@ -136,6 +136,11 @@ run = "treefmt"
 description = "Verify formatting without writing (used in CI)"
 run = "treefmt --ci"
 
+[tasks.release]
+description = "Bump VERSION and CHANGELOG, commit and tag; usage: mise run release <major|minor|patch> [--dry-run]"
+# mise appends the extra command-line arguments to a string `run`.
+run = "bash scripts/release.sh"
+
 [tasks.clean]
 description = "Remove generated coverage files"
 run = '''

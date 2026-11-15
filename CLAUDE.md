@@ -22,6 +22,7 @@ The toolchain comes from [mise](https://mise.jdx.dev) (`mise.toml`). `mise run <
 - `mise run format` - treefmt over the whole tree
 - `mise run format-check` - treefmt without writing (CI)
 - `mise run all` - format, check and test; run it before every commit
+- `mise run release <major|minor|patch> [--dry-run]` - bump `VERSION` and `CHANGELOG.md`, commit and tag; never pushes
 
 ## Structure
 
@@ -65,7 +66,7 @@ Local `integration` uses plenary installed at `~/.local/share/nvim/site/pack/ven
 
 ## Version
 
-The version is bumped by hand, with no tool, in the same PR that closes a feature: `VERSION` plus a new `CHANGELOG.md` entry. Before 1.0, each closed feature bumps the minor (`0.2.0`, `0.3.0`...) and each fix between features bumps the patch. `1.0.0` is the user's decision, once the plugin is stable in daily use. The `vX.Y.Z` tag is created by hand, only with the user's authorization at that moment. `lua/claudinho/init.lua` reads `M.version` from `VERSION`; do not hardcode the number elsewhere.
+During a feature, add changes under `## [Unreleased]` in `CHANGELOG.md`. When a feature closes (its spec set to Implemented), the closing step runs `mise run release minor` (before 1.0; a fix between features: `patch`; `1.0.0` is the user's decision, once the plugin is stable in daily use). `scripts/release.sh` needs a clean tree on `main`, a valid `VERSION`, at least one entry under Unreleased and no existing tag. It then turns Unreleased into `## [X.Y.Z] - <today>`, updates the links, writes `VERSION`, commits `chore(release): X.Y.Z` and creates the annotated tag `vX.Y.Z`. It never pushes: the user runs the `git push origin main vX.Y.Z` it prints. Use `--dry-run` to preview. `lua/claudinho/init.lua` reads `M.version` from `VERSION`; do not hardcode the number elsewhere.
 
 ## Workflow
 
