@@ -1,7 +1,7 @@
 # Fase 0 · Fork limpo
 
 - **Date:** 2026-11-12
-- **Status:** Approved
+- **Status:** Implemented
 - **Spec:** [spec.md](spec.md)
 
 ## Goal

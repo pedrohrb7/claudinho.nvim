@@ -319,3 +319,9 @@ Mode: `--step` (pause after each task). At the start of the run the working tree
 
 - **Manual script:** the user ran it in their Neovim test config after the review fixes and reported it passed (steps 1-6 had passed earlier, in Task 8, with the real `claude`); the tree and diff review (rule 39) was done in Task 14 step 2, where the new root commit's tree was checked identical to `8da00e5`.
 - **Status:** Task 13 done on 2026-11-15. The spec stays `In progress` until Task 14 step 5 is confirmed.
+
+### Task 14 - closed (done)
+
+- **Step 4 follow-up:** the user pushed `892bacc` on top of `64f1422`; the CI was running when the user closed the task (2026-11-15), so its result is not recorded here.
+- **Step 5:** closed by the user's decision with the CI run in progress. Branch rules that required `covered-lock`/`pr-title` and the plugin reinstall in the Neovim config (rule 42) are the user's own follow-ups.
+- **Feature status:** every task (1-14) is done; spec and plan set to `Implemented`, and the Index updated.
