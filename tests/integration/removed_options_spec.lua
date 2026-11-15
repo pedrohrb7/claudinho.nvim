@@ -1,0 +1,57 @@
+-- Real-Neovim check that the removed-option warnings come out once per key and per session, even if setup() runs
+-- again. Mock vim has no real vim.notify_once, so under busted this is pending.
+if vim == nil or vim.fn.has("nvim") ~= 1 then
+  describe("removed options", function()
+    pending("needs a real Neovim")
+  end)
+  return
+end
+
+describe("removed options", function()
+  local saved_notify = vim.notify
+  local notifications
+
+  before_each(function()
+    notifications = {}
+    vim.notify = function(msg, level)
+      table.insert(notifications, { msg = msg, level = level })
+    end
+  end)
+
+  after_each(function()
+    vim.notify = saved_notify
+  end)
+
+  local function removed_config()
+    return {
+      auto_start = false,
+      queue_timeout = 5000,
+      diff_opts = {
+        vertical_split = true,
+        open_in_current_tab = true,
+        auto_close_on_accept = true,
+        show_diff_stats = true,
+      },
+      terminal = { provider = "snacks", snacks_win_opts = {} },
+    }
+  end
+
+  it("shows one warning per key on the first setup and none on the second", function()
+    local claudinho = require("claudinho")
+    claudinho.setup(removed_config())
+
+    local warns = {}
+    for _, n in ipairs(notifications) do
+      if n.level == vim.log.levels.WARN and n.msg:find("was removed", 1, true) then
+        table.insert(warns, n.msg)
+      end
+    end
+    assert.are.equal(7, #warns)
+
+    notifications = {}
+    claudinho.setup(removed_config())
+    for _, n in ipairs(notifications) do
+      assert.is_nil(n.msg:find("was removed", 1, true))
+    end
+  end)
+end)

@@ -1,0 +1,177 @@
+name: Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+
+permissions:
+  contents: read
+
+# Cancel in-progress runs for pull requests when developers push
+# additional changes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  # Unit/component tests run under LuaJIT with a mocked vim global (busted), so
+  # they do not need a real Neovim binary — hence no neovim-version matrix here.
+  # Real-Neovim coverage lives in the integration-tests job below.
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up mise
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+        with:
+          # --locked installs only tools listed in mise.lock, fails when an entry is missing, and never rewrites it.
+          # Without it, `mise install` fills in missing lock data and downloads tools again to do it, so a slow
+          # www.lua.org failed this step.
+          install_args: --locked
+          # mise is pinned because `--locked` rules change between releases (2026.11.0 started to require a
+          # checksum). sha256 is the linux-x64 mise binary from the v2026.11.5 release.
+          version: 2026.11.5
+          sha256: 7a5b051d6f17d335c502f8047a5175cf3103f347d91942771c60da4e302ebcb0
+
+      # Cache the rock tree (rebuilt from luarocks.org otherwise); a miss just rebuilds.
+      - name: Cache Lua test rocks
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: .luarocks
+          key: luarocks-${{ runner.os }}-${{ hashFiles('mise.toml') }}
+
+      - name: Install Lua test rocks
+        run: mise run setup
+
+      - name: Run luacheck
+        run: mise run check
+
+      - name: Run tests
+        run: mise run test
+
+      - name: Check formatting
+        run: mise run format-check
+
+      - name: Generate coverage report
+        run: |
+          if [ -f "luacov.stats.out" ]; then
+            ./.luarocks/bin/luacov
+
+            summary=$(mktemp)
+            status=0
+            scripts/coverage-summary.sh luacov.report.out "$PWD" > "$summary" || status=$?
+            cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+            exit "$status"
+          else
+            {
+              echo "## 📊 Test Coverage Report"
+              echo ""
+              echo "❌ No coverage data found - tests may not have run with coverage enabled"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    strategy:
+      matrix:
+        # v0.12.0 is the minimum that plugin/claudinho.lua and the health check support.
+        neovim-version: ["stable", "v0.12.0"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Neovim here comes from action-setup-vim (matrix-driven), independent of
+      # the mise.toml neovim pin used for local dev.
+      - name: Setup Neovim
+        uses: rhysd/action-setup-vim@8e931b9954b19d4203d5caa5ff5521f3bc21dcc7 # v1.4.2
+        with:
+          neovim: true
+          version: ${{ matrix.neovim-version }}
+
+      - name: Install test dependencies
+        env:
+          # plenary.nvim's master head since 2026-04-10, which the unpinned clone fetched until now.
+          # Pinned so a new plenary commit cannot change or break CI (for example by dropping the minimum Neovim the matrix runs).
+          # Whoever bumps the pin must recheck plenary's per-file timeout (50s, test_harness.lua) against FILE_TIMEOUT
+          # in scripts/run_integration_tests_individually.sh: that limit plus its kill grace must stay below it.
+          PLENARY_SHA: 74b06c6c75e4eeb3108ec01852001636d85a932b
+        run: |
+          plenary=~/.local/share/nvim/site/pack/vendor/start/plenary.nvim
+          git init -q "$plenary"
+          git -C "$plenary" fetch -q --depth 1 https://github.com/nvim-lua/plenary.nvim "$PLENARY_SHA"
+          git -C "$plenary" checkout -q FETCH_HEAD
+          git -C "$plenary" log -1 --format='plenary.nvim %H %cs'
+          ln -s "$(pwd)" ~/.local/share/nvim/site/pack/vendor/start/claudinho.nvim
+
+      - name: Run integration tests
+        run: ./scripts/run_integration_tests_individually.sh
+
+      # A test that hands a temp path to an Ex command without fnameescape fails on a `%` or a space in TMPDIR (E499,
+      # a split path), and no other step has such a TMPDIR.
+      - name: Run integration tests under a TMPDIR with a space and a %
+        run: |
+          odd_tmp="$RUNNER_TEMP/odd tmp 50%"
+          mkdir -p "$odd_tmp"
+          TMPDIR="$odd_tmp" ./scripts/run_integration_tests_individually.sh
+
+      # Only the legacy diff.open_diff writes temp files under stdpath("cache"). diff_legacy_swap_spec.lua points that
+      # at a temp folder, and a spec that uses the real cache folder shows here.
+      - name: Check the integration tests left the real cache folder alone
+        run: |
+          cache="${XDG_CACHE_HOME:-$HOME/.cache}/nvim"
+          if [ -e "$cache" ]; then
+            echo "::error::A test wrote under $cache"
+            find "$cache" | head -20
+            exit 1
+          fi
+
+      # Regression gate for scripts/manual_test_helper.lua. It once hardcoded one developer's
+      # checkout path, so it printed "README.md not found" in every other checkout. Run it by
+      # absolute path from a directory outside the repo. It must open this checkout's README.md,
+      # and the openDiff handler's coroutine must suspend.
+      - name: Manual openDiff helper works outside the repo
+        env:
+          REPO: ${{ github.workspace }}
+        run: |
+          cd "$(mktemp -d)"
+          output="$(timeout 60 nvim --headless -u NONE --cmd "set rtp+=$REPO" -c "luafile $REPO/scripts/manual_test_helper.lua" -c "sleep 300m" -c "qa!" 2>&1)"
+          printf '%s\n' "$output"
+          grep -qF "Old file: $REPO/README.md" <<<"$output" || { echo "FAIL: the helper did not open $REPO/README.md"; exit 1; }
+          grep -qF "openDiff is properly blocking!" <<<"$output" || { echo "FAIL: the openDiff coroutine did not suspend"; exit 1; }
+
+  required:
+    name: Required
+    runs-on: ubuntu-latest
+    needs:
+      - unit-tests
+      - integration-tests
+    if: ${{ always() }}
+
+    steps:
+      - name: Check required jobs
+        env:
+          UNIT_TESTS_RESULT: ${{ needs.unit-tests.result }}
+          INTEGRATION_TESTS_RESULT: ${{ needs.integration-tests.result }}
+        run: |
+          echo "unit-tests: $UNIT_TESTS_RESULT"
+          echo "integration-tests: $INTEGRATION_TESTS_RESULT"
+
+          if [ "$UNIT_TESTS_RESULT" != "success" ] || [ "$INTEGRATION_TESTS_RESULT" != "success" ]; then
+            echo "One or more required jobs failed."
+            exit 1
+          fi

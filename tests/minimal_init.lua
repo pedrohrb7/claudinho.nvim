@@ -1,0 +1,76 @@
+-- Minimal Neovim configuration for tests
+
+-- Put the stub tests/bin/claude first on PATH so no test starts the host's real claude. Neovims that plenary's
+-- test_file starts load this file again with the inherited PATH, so prepend only once.
+local stub_dir = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h") .. "/bin"
+local path = vim.env.PATH or ""
+if path:sub(1, #stub_dir + 1) ~= stub_dir .. ":" then
+  vim.env.PATH = stub_dir .. (path ~= "" and ":" .. path or "")
+end
+
+-- Set up package path
+local package_root = vim.fn.stdpath("data") .. "/site/pack/vendor/start/"
+local install_path = package_root .. "plenary.nvim"
+
+if vim.fn.empty(vim.fn.glob(install_path)) > 0 then
+  vim.fn.system({
+    "git",
+    "clone",
+    "--depth",
+    "1",
+    "https://github.com/nvim-lua/plenary.nvim",
+    install_path,
+  })
+  vim.cmd([[packadd plenary.nvim]])
+end
+
+-- Add package paths for development
+vim.opt.runtimepath:append(vim.fn.expand("$HOME/.local/share/nvim/site/pack/vendor/start/plenary.nvim"))
+-- Add current working directory to runtime path for development
+vim.opt.runtimepath:prepend(vim.fn.getcwd())
+
+-- Set up test environment
+vim.g.mapleader = " "
+vim.g.maplocalleader = " "
+vim.opt.termguicolors = true
+vim.opt.timeoutlen = 300
+vim.opt.updatetime = 250
+
+-- Disable some built-in plugins
+local disabled_built_ins = {
+  "gzip",
+  "matchit",
+  "matchparen",
+  "netrwPlugin",
+  "tarPlugin",
+  "tohtml",
+  "tutor",
+  "zipPlugin",
+}
+
+for _, plugin in pairs(disabled_built_ins) do
+  vim.g["loaded_" .. plugin] = 1
+end
+
+-- Check for claudinho-specific tests by examining command line or environment
+local should_load = false
+
+-- Method 1: Check command line arguments for specific test files
+for _, arg in ipairs(vim.v.argv) do
+  if arg:match("command_args_spec") or arg:match("mcp_tools_spec") then
+    should_load = true
+    break
+  end
+end
+
+-- Method 2: Check if CLAUDINHO_INTEGRATION_TEST env var is set
+if not should_load and os.getenv("CLAUDINHO_INTEGRATION_TEST") == "true" then
+  should_load = true
+end
+
+if not vim.g.loaded_claudinho and should_load then
+  require("claudinho").setup({
+    auto_start = false,
+    log_level = "trace", -- More verbose for tests
+  })
+end

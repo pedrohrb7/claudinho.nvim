@@ -1,0 +1,5 @@
+return {
+  default = {
+    helper = "tests/helpers/busted_helper.lua",
+  },
+}
