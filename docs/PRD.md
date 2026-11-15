@@ -104,15 +104,15 @@ O status de cada plano e spec fica no Index de `docs/features/README.md`.
 
 Fase 0 · Fork limpo (detalhe no plano):
 
-- [ ] Renomear `lua/claudecode/`, `plugin/` e todo identificador do plugin pro namespace `claudinho`
-- [ ] Remover `terminal/snacks.lua`, `snacks_win_opts` e a leitura do snacks picker e explorer
-- [ ] Remover as opções legadas de diff (`vertical_split`, `open_in_current_tab`, `auto_close_on_accept`, `show_diff_stats`) e o `queue_timeout`, com aviso pra quem ainda as usa
-- [ ] Neovim mínimo 0.12 no loader e no CI
-- [ ] Reduzir o repo ao que fica: sai release-please, Communique, skills de verificação e TLA+, scripts e fixtures `repro_issue_*` e as docs do upstream (`STORY.md` e outras)
-- [ ] `README.md` (pt-BR) e `README.en.md` novos, `CLAUDE.md` curto, `CHANGELOG.md` novo, `LICENSE` com a linha do autor do fork
-- [ ] `VERSION` em `0.1.0`
-- [ ] Testes verdes
-- [ ] Recomeço do git e desvínculo no GitHub, só com autorização a cada passo
+- [x] Renomear `lua/claudecode/`, `plugin/` e todo identificador do plugin pro namespace `claudinho`
+- [x] Remover `terminal/snacks.lua`, `snacks_win_opts` e a leitura do snacks picker e explorer
+- [x] Remover as opções legadas de diff (`vertical_split`, `open_in_current_tab`, `auto_close_on_accept`, `show_diff_stats`) e o `queue_timeout`, com aviso pra quem ainda as usa
+- [x] Neovim mínimo 0.12 no loader e no CI
+- [x] Reduzir o repo ao que fica: sai release-please, Communique, skills de verificação e TLA+, scripts e fixtures `repro_issue_*` e as docs do upstream (`STORY.md` e outras)
+- [x] `README.md` (pt-BR) e `README.en.md` novos, `CLAUDE.md` curto, `CHANGELOG.md` novo, `LICENSE` com a linha do autor do fork
+- [x] `VERSION` em `0.1.0`
+- [x] Testes verdes
+- [x] Recomeço do git e desvínculo no GitHub, só com autorização a cada passo (passo 5, CI e regras de branch, pendente em 2026-11-15)
 
 Fase 1 · Janela do terminal, Fase 5 · Comandos e parte da Fase 3 (status): plano da UI base. A fundação técnica (`events.lua`, `sources/ide_protocol.lua`, interfaces de `ui/adapters` com implementação nativa) entra quando e como a spec da UI base decidir.
 

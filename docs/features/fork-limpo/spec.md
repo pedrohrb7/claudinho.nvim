@@ -5,6 +5,7 @@
 - **Approved:** 2026-11-14, pelo usuário, mantendo a integração local no Neovim 0.12.0 e no 0.12.3 (Task 13)
 - **Addendum 2026-11-14:** o agente de stack das Tasks 2 a 8 se chama `lua`, não `lua-neovim`. Só o nome muda; nenhuma task muda de escopo.
 - **Addendum 2026-11-15:** a guarda contra o claudecode.nvim também o detecta pelo runtimepath, e o `:checkhealth` reporta o conflito; ver o adendo no fim da [seção 6](#6-guarda-contra-o-claudecodenvim-task-7).
+- **Addendum 2026-11-15 (Task 14):** o usuário rodou o fluxo da regra 40; o histórico recomeçou no commit `64f1422`, e o passo 5 ficou pendente na data; ver o adendo no fim de [Recomeço do git](#recomeço-do-git-task-14-só-o-usuário-executa).
 - **Plan:** [plan.md](plan.md)
 - **Implementation log:** [log.md](log.md)
 
@@ -556,7 +557,7 @@ Stacks: `lua` (Tasks 2 a 8) fica fora da lista do template, pela pré-condição
 - **Files:** nenhum arquivo do repo (resultados no `log.md`)
 - **Depends on:** Task 9, Task 10, Task 11, Task 12
 - **Done when:** `all` verde; `integration` verde no 0.12.3 e no 0.12.0, com o plenary local fixado no SHA do CI; os comandos de critério da Verificação só mostram as exceções permitidas; o log tem a tabela antes/depois (testes por estado e cobertura total e por arquivo) e explica cada diferença pelos testes de "Testes que saem" e pelos novos; o usuário fez o roteiro manual inteiro (regra 30) e revisou a árvore e o diff contra o `HEAD` (regra 39)
-- **Status:** pending
+- **Status:** done
 
 ### Task 14 - Recomeço do git e do remoto (usuário, não delegável)
 
@@ -626,6 +627,20 @@ Cada passo só com a autorização do usuário no momento (regra 38). Antes do p
 3. **Desvincular no GitHub:** se `pedrohrb7/claudinho.nvim` mostra "forked from coder/claudecode.nvim", usar "Leave fork network" nas Settings (público e menor que 1 GB) ou apagar e recriar com o mesmo nome. Se não é fork, o passo não existe.
 4. **Push:** `git push --force origin main`; apagar no remoto os branches e as tags do upstream (`git push origin --delete <ref>`). Depois, remover e instalar de novo o plugin na config do Neovim (regra 42).
 5. **Depois:** o CI roda no commit novo e precisa passar; o usuário ajusta as regras de branch que exigiam `covered-lock` ou `pr-title`.
+
+#### Adendo 2026-11-15 - decisão da Task 14: fluxo da regra 40 executado
+
+Decisão do usuário: rodar o fluxo da regra 40. O usuário executou cada passo em 2026-11-15, com autorização em cada um. O texto aprovado acima fica como está; este adendo registra o que foi feito.
+
+| Passo                    | Resultado                                                                                                                                                                                                                                                                              |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Backup                | `~/backups/claudecode-history.bundle` (3,5 MB). `git bundle verify`: histórico completo; refs `docs/fork-planning` em `8da00e5`, `main` em `d123707` e os dois branches remotos                                                                                                        |
+| 2. Histórico novo        | Branch órfão com um commit só, `64f1422 chore: initial commit of claudinho.nvim 0.1.0`, cuja árvore é idêntica à de `8da00e5` (conferido pela sessão principal). Branches locais antigos apagados, reflog expirado, `gc` rodado                                                        |
+| 3. Desvincular no GitHub | O repo no GitHub era fork de `coder/claudecode.nvim`; o usuário usou "Leave fork network" e o rótulo "forked from" sumiu                                                                                                                                                               |
+| 4. Push                  | `git push --force` do `main`; `docs/fork-planning` e as tags do upstream que existiam apagados no remoto. `git ls-remote --heads --tags origin` mostra só `refs/heads/main` em `64f1422`. O clone local tem só `main`/`origin/main` em `64f1422`, 1 commit alcançável, pack de 632 KiB |
+| 5. Depois                | Pendente na data deste adendo: CI verde em `64f1422`, ajuste das regras de branch que exigiam `covered-lock`/`pr-title`, e a reinstalação do plugin na config do Neovim do usuário (regra 42; o usuário está testando agora na config de teste)                                        |
+
+Os commits seguintes (este adendo, o log e o fechamento das Tasks 13 e 14) entram em cima de `64f1422`.
 
 ## Open questions
 
