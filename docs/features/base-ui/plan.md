@@ -5,6 +5,7 @@
 - **Spec:** [spec.md](spec.md) <!-- once written -->
 - **Addendum 2026-11-12:** rótulos e mensagens do plugin em inglês, pela decisão de idioma da Fase 0 ([fork-limpo](../fork-limpo/plan.md)). Ver [Addendum](#addendum-2026-11-12-idioma-da-interface).
 - **Addendum 2026-11-12:** Neovim mínimo 0.12, decidido no `docs/PRD.md` e aplicado pela Fase 0 ([fork-limpo](../fork-limpo/plan.md)). Ver [Addendum](#addendum-2026-11-12-neovim-mínimo-012).
+- **Addendum 2026-11-15:** registro da origem do código, o bloqueio do claudecode.nvim vira aviso, mecanismo das chaves removidas, release `0.2.0` na entrega, notificações informativas desligadas por padrão, layout só pela config (sai o `:Claudinho layout`) e esclarecimento sobre o que persiste entre reinícios. Ver [Addendum](#addendum-2026-11-15-origem-do-código-claudecodenvim-notificações-layout-e-release).
 
 ## Goal
 
@@ -343,3 +344,82 @@ Origem: decisão do `docs/PRD.md` (atualizado e aprovado em 2026-11-12), aplicad
 
 - A versão mínima do Neovim deixa de ser decisão em aberto. No item de **Out of scope** sobre as decisões em aberto do PRD, vale agora só a parte das integrações de explorer, que continuam como estão depois da Fase 0.
 - A UI base parte de um plugin que já só carrega no Neovim 0.12 ou mais novo, então a spec pode usar as APIs de janela e winbar dessa versão sem fallback para versões anteriores.
+
+## Addendum 2026-11-15: origem do código, claudecode.nvim, notificações, layout e release
+
+Origem: a Fase 0 ([fork-limpo](../fork-limpo/plan.md)) está Implemented, na versão `0.1.0` ([spec](../fork-limpo/spec.md), [log](../fork-limpo/log.md)), e o usuário tomou seis decisões em 2026-11-15. As regras abaixo continuam a numeração do plano; cada item diz qual parte aprovada acima ele complementa ou muda. O texto aprovado acima não foi reescrito: onde ele e este adendo divergem, vale este adendo.
+
+### 1. Origem do código
+
+Complementa o item "Testes e docs" do **Scope** e o critério "Entrega fechada" (ver o item 4).
+
+72. Ao trocar os `:ClaudeCode*` por `:Claudinho` e reescrever módulos, a feature mantém o registro de onde o código veio:
+    - a atribuição ao upstream (hard fork de `coder/claudecode.nvim` no commit `d1237072`) continua em `README.md`, `README.en.md`, `CHANGELOG.md` e no `LICENSE` (aviso MIT da Coder);
+    - as notas do upstream no topo de `PROTOCOL.md` e `ARCHITECTURE.md` continuam, atualizadas onde esta feature muda o que elas descrevem (por exemplo, um servidor e um lock file por aba);
+    - todo módulo reescrito ou derivado de um arquivo do upstream leva no cabeçalho uma linha curta de origem que nomeia o arquivo do upstream de onde vem (ex.: derivado de `lua/claudecode/terminal.lua`). Módulo novo, sem arquivo de origem, não leva a linha. O texto exato, em inglês, fica para a spec.
+
+O item "Testes e docs" do **Scope** passa a incluir também `README.en.md`, `ARCHITECTURE.md`, `CHANGELOG.md` e as linhas de origem nos módulos.
+
+### 2. claudecode.nvim instalado junto
+
+Muda a regra 7 da Fase 0 ([fork-limpo](../fork-limpo/plan.md)), hoje cumprida por `lua/claudinho/conflict.lua`: o Claudinho se recusa a rodar quando o claudecode.nvim está carregado ou no runtimepath, porque os dois registram os mesmos `:ClaudeCode*`. Complementa a regra 64 deste plano.
+
+Depois desta feature nada colide mais: os comandos são `:Claudinho` contra `:ClaudeCode*`, os identificadores já foram renomeados na Fase 0, servidores, portas e lock files são separados, as variáveis de ambiente existem só em cada processo (regra 62) e os registros de diff são separados. O que sobra é incômodo, não conflito: duas entradas parecidas no `/ide`, a seleção acompanhada duas vezes e duas formas de abrir o Claude. Decisão do usuário (opção B): a recusa vira aviso.
+
+73. Com o claudecode.nvim detectado, os dois plugins rodam. O Claudinho carrega e funciona normalmente, e mostra um aviso por sessão do Neovim dizendo que o claudecode.nvim está instalado e sugerindo removê-lo.
+74. `:checkhealth claudinho` mostra o claudecode.nvim detectado como aviso (warning), não como erro.
+75. A detecção é a da Fase 0: `vim.g.loaded_claudecode` definido ou `lua/claudecode/init.lua` no runtimepath.
+76. Até esta feature ser entregue, a recusa da Fase 0 continua valendo; ela só muda junto com a troca dos comandos para `:Claudinho`.
+
+O texto exato do aviso e do health check, em inglês, fica para a spec. A seção "Coming from claudecode.nvim" / "Vindo do claudecode.nvim" dos dois READMEs (regra 33 da Fase 0) troca "os dois não rodam juntos" por "os dois rodam, mas o recomendado é remover o claudecode.nvim".
+
+| Situação                                                                           | Comportamento esperado                                                                                                         |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| claudecode.nvim no runtimepath mas não carregado (lazy-load)                       | Conta como detectado (regra 75): aviso e health check como warning; o Claudinho roda                                           |
+| Os dois plugins ativos, `/ide` num claude aberto fora do Neovim                    | Lista as entradas do claudecode.nvim e as do Claudinho (`Neovim (Claudinho <n>)`, regra 7); nenhuma conecta sozinha (regra 62) |
+| Preset de atalhos ligado e o usuário já mapeou `<leader>a*` para o claudecode.nvim | Regra 69: o preset não sobrescreve essas teclas e avisa                                                                        |
+
+### 3. Chaves removidas do terminal
+
+Diz como a regra 71 é cumprida; nenhum comportamento muda.
+
+77. A regra 71 reusa o mecanismo de chaves removidas da Fase 0 (`config.removed_options` em `lua/claudinho/config.lua`: um aviso `vim.notify_once` por chave, nomeando o substituto, e o `setup` continua funcionando). Esta feature só acrescenta à tabela as chaves que remove: `terminal.provider`, `terminal.provider_opts`, `terminal.external_terminal_cmd`, `terminal.split_side`, `terminal.split_width_percentage`, `terminal.auto_start` e as demais que a spec remover. A linha atual de `terminal.provider = "snacks"` passa a ser coberta pela de `terminal.provider`; a spec decide como as duas convivem.
+
+### 4. Release na entrega
+
+Muda o critério "Entrega fechada" do **Goal**. Segue o passo de release criado em 2026-11-15 (`mise run release minor`, ver a seção "Version" do `CLAUDE.md`).
+
+78. Durante a feature, cada mudança visível para o usuário entra em `## [Unreleased]` no `CHANGELOG.md`.
+79. A feature fecha com o passo de release: `mise run release minor` transforma o Unreleased em `## [0.2.0]`, grava `0.2.0` no `VERSION`, faz o commit `chore(release): 0.2.0` e cria a tag `v0.2.0`. O push fica com o usuário.
+
+O critério "Entrega fechada" passa a ser:
+
+| Critério        | Como medir                                                                                                                                                                                                                                                                           |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Entrega fechada | `mise run all` verde, README atualizado, nenhuma entrada nova em `docs/backlog/`, origem do código registrada (regra 72) e release feito (regra 79): `VERSION` em `0.2.0`, `CHANGELOG.md` com `## [0.2.0]` e o Unreleased vazio, commit `chore(release): 0.2.0` e tag local `v0.2.0` |
+
+### 5. Notificações informativas desligadas por padrão
+
+Muda as regras 31, 40, 69, 71, 73 e 77 no ponto em que elas mostram uma notificação: essa notificação passa a depender da opção abaixo. Nenhum outro comportamento dessas regras muda.
+
+80. Uma opção nova da config (nome na spec, ex.: `notify`), desligada por padrão, controla toda notificação informativa do plugin. Desligada, nenhuma aparece; ligada, cada uma se comporta como o plano descreve.
+81. São informativas: o aviso de diff em segundo plano (regra 31), `Claude <n> exited` (regra 40), os avisos de chave removida (regras 71 e 77, incluindo os que a Fase 0 já emite), o aviso de claudecode.nvim instalado (regras 73 a 76), o aviso de tecla do preset já mapeada (regra 69) e qualquer outra notificação informativa que a spec acrescentar. As respostas a um comando do usuário da regra 89 não são informativas.
+82. Erros sempre aparecem, com a opção ligada ou desligada, porque sem eles uma ação falharia em silêncio: o comando do Claude ausente ou que falha ao iniciar, falha de porta ou de lock file, subcomando ou argumentos inválidos, os casos de borda que dizem "erro", o layout inválido na config (regra 88) e as respostas da regra 89.
+83. Com a opção desligada, o estado continua visível sem notificação: as marcas `● diff` e `[exited]` na barra de abas, e o `:checkhealth claudinho`, que reporta como aviso (warning) as chaves removidas presentes na config do usuário e o claudecode.nvim instalado.
+84. Consequência: no padrão, o aviso de claudecode.nvim instalado (regra 73) e os avisos de chave removida só aparecem no `:checkhealth claudinho`. Os avisos da Fase 0 continuam aparecendo na `0.1.0` até esta feature ser entregue.
+85. Um aviso que responde a um comando do usuário que não fez o que ele pediu sempre aparece, como os erros, com a opção da regra 80 ligada ou desligada: `tab-restart` numa aba rodando (regra 42), `tab-restart` sem `session_id` que abre uma sessão nova (regra 43), `No Claude tabs open` e o envio para uma aba encerrada (casos de borda), e qualquer outro aviso desse tipo que a spec acrescentar. Ele só aparece em resposta a uma ação do usuário, e sem ele o comando falharia ou mudaria de efeito em silêncio.
+
+### 6. Layout só pela config
+
+Muda as regras 18, 64 e 68, o **Scope**, os casos de borda, o fluxo "Trocar layout" e um critério de sucesso do **Goal**.
+
+85. O layout da janela vem só da config: o padrão `right` e os tamanhos por layout da regra 17. Trocar de layout é mudar a config e reiniciar o Neovim. A troca em tempo de execução da regra 18 deixa de existir.
+86. O subcomando `:Claudinho layout` é removido. Saem com ele: a linha `layout <nome>` da tabela de comandos (regra 64), os nomes de layout na completion (regra 68, que fica com os subcomandos e os números das abas), os casos de borda "`layout` com nome inválido" e "`layout` com o layout atual", o fluxo "Trocar layout" e, no item de janela do **Scope**, "com troca de layout sem matar sessão". `:Claudinho layout` passa a ser um subcomando desconhecido (regra 67).
+87. O critério de sucesso "Esconder, mostrar, trocar de aba e de layout nunca encerra sessão" passa a ser "Esconder, mostrar e trocar de aba nunca encerra sessão", medido do mesmo jeito: 10 ciclos de cada, com os PIDs dos `claude` das abas iguais.
+88. Um valor de layout inválido na config cai em `right`, com uma mensagem de nível erro que nomeia o valor recebido e os válidos (é erro de config, então aparece mesmo com as notificações desligadas, regra 82). O resto da config funciona.
+
+A regra 25 (no `float`, a janela se esconde quando um diff abre) continua valendo para quem escolhe `float` na config.
+
+### 7. Esclarecimento: o que persiste entre reinícios
+
+Não muda nenhuma regra. O preset de atalhos (regra 69) e o layout (regra 85) vêm só da config do usuário e são aplicados pelo `setup()` em todo início do Neovim, então persistem entre reinícios enquanto estiverem na config. Não existe mais escolha em tempo de execução que se perde ao sair; só as abas morrem com o Neovim, como o **Out of scope** já diz.
