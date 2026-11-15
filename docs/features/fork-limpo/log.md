@@ -303,3 +303,19 @@ Mode: `--step` (pause after each task). At the start of the run the working tree
   Coverage per file that changed (before -> after, %): `config.lua` 94.21 -> 96.55; `conflict.lua` new -> 93.75; `health.lua` 84.21 -> 94.94; `init.lua` 67.71 -> 73.05; `integrations.lua` 67.62 -> 63.01 (the snacks picker branch, mostly covered, left; the rest is unchanged code); `logger.lua` 82.61 -> 88.17; `terminal.lua` 77.57 -> 78.51; `terminal/native.lua` 94.78 -> 91.57 (the covered `stop_snacks_terminal` left); `terminal/owned.lua` 100 -> 100 (41 -> 13 lines); `diff.lua` 92.67 -> 92.79; `terminal/snacks.lua` 89.18 -> removed. Every other file is unchanged. `plugin/claudinho.lua` now has coverage data (93.33%), which the baseline lacked.
 
 - **Pending for Task 13 done:** the user runs the full manual script (spec "Roteiro manual do usuário", steps 1-12, rule 30) and reviews the tree and the diff against `HEAD` (rule 39).
+
+### Task 14 - Recomeço do git e do remoto (steps 1-4 done; step 5 pending)
+
+- **Who:** the user ran every step, with authorization at each one (rule 38); the main session prepared the commands and checked each result. Nothing was delegated.
+- **Step 1, backup:** `~/backups/claudecode-history.bundle` (3.5 MB); `git bundle verify` reports a complete history, with `docs/fork-planning` at `8da00e5`, `main` at `d123707` and the two remote branches.
+- **Step 2, new history:** the user confirmed the rule 41 losses; orphan branch, one commit `64f1422 chore: initial commit of claudinho.nvim 0.1.0`, whose tree (`608b725`) is identical to `8da00e5`'s (checked against the bundle); old local branches deleted, reflog expired, `gc`.
+- **Step 3, GitHub:** the repository showed "forked from coder/claudecode.nvim"; the user used "Leave fork network" and the label is gone.
+- **Step 4, push:** `git push --force origin main`, `docs/fork-planning` and any upstream tags deleted on the remote. `git ls-remote --heads --tags origin` lists only `refs/heads/main` at `64f1422`. The local clone has only `main`, `origin/main` and `origin/HEAD` at `64f1422`, 1 reachable commit, pack 632 KiB, no loose objects. A stale `origin/docs/fork-planning` ref was cleared by `git fetch --prune`.
+- **Step 5, pending:** CI green on `64f1422`; branch rules that required `covered-lock` or `pr-title` adjusted; the plugin removed and installed again in the user's Neovim config (rule 42; the user is testing it in their test config). Task 14 is marked done once the user confirms these.
+- **Spec addendum:** written by specker at the end of "Recomeço do git" (Verification).
+- **Note:** commits after the restart (this log, the addendum, the closing of Tasks 13 and 14) land on top of `64f1422`.
+
+### Task 13 - closed (done)
+
+- **Manual script:** the user ran it in their Neovim test config after the review fixes and reported it passed (steps 1-6 had passed earlier, in Task 8, with the real `claude`); the tree and diff review (rule 39) was done in Task 14 step 2, where the new root commit's tree was checked identical to `8da00e5`.
+- **Status:** Task 13 done on 2026-11-15. The spec stays `In progress` until Task 14 step 5 is confirmed.
