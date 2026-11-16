@@ -771,7 +771,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `lua/claudinho/sources/session_data.lua`, `lua/claudinho/ui/status.lua`, `lua/claudinho/ui/tabbar.lua`, `tests/unit/sources/session_data_spec.lua`, `tests/unit/ui/status_spec.lua`, `tests/unit/ui/tabbar_spec.lua`, `tests/fixtures/claude/*.json`
 - **Depends on:** Task 1
 - **Done when:** a seção 3 está aplicada sem estado global (render recebe tudo por argumento; a ligação às abas é da Task 10); os três specs passam; gate verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 6 - Config nova e notificações
 

@@ -13,3 +13,4 @@ Confirmed bugs that need fixing, one file per bug.
 
 | Entry | Severity | Status |
 | ----- | -------- | ------ |
+| [Teste claude_stub "is the first PATH entry" falha no runner completo](2026-11-16-claude-stub-path-first-entry-integration.md) | medium | Open |

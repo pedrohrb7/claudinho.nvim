@@ -1,0 +1,6 @@
+{
+  "session_id": "s1",
+  "hook_event_name": "SomethingNew",
+  "permission_mode": "auto",
+  "payload": { "x": [1, 2] }
+}

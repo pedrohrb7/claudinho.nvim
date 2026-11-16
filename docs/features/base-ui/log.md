@@ -108,3 +108,31 @@ Mode: `--step` (pause after each task; commit each task with the user's approval
 - **Approved scope:** none.
 - **Migrations / env vars:** `CLAUDINHO_PORT` and `CLAUDINHO_TOKEN`, read by the relay; the session sets them in the tab process (Task 8).
 - **Docs pending:** `ARCHITECTURE.md` and `PROTOCOL.md` (Task 20): per-tab lock file fields, the settings file, the relay script and its exit-0 contract. `CLAUDE.md` (Task 18): `session_settings.lua` and `sources/relay.lua` in the structure list.
+
+## Run 2026-11-16
+
+Mode: `--step`, same gate policy as the 2026-11-15 run. The run state `.claude/runs/base-ui.json` was missing and was recreated from this log (Tasks 1-4 done). Toolchain reinstalled by the user before the gate (mise, `mise install --locked`, `mise run setup`, plenary at the CI SHA).
+
+### Task 5 - Dados da sessão, status e barra de abas (funções puras) (done)
+
+- **Files:**
+  - New `lua/claudinho/sources/session_data.lua`: `decode`, `from_statusline`, `from_hook`, `model_label` (pure).
+  - New `lua/claudinho/ui/status.lua`: `text(data)`, `MODES`, `mode_label`; items joined with `" · "`, `%` escaped.
+  - New `lua/claudinho/ui/tabbar.lua`: `clean_title`, `marks`, `label`, `layout`, `render`, `setup_highlights`, `click`, `install_click_handler`.
+  - New `tests/unit/sources/session_data_spec.lua` (22), `tests/unit/ui/status_spec.lua` (12), `tests/unit/ui/tabbar_spec.lua` (36); new `tests/fixtures/claude/*.json` (13: 9 statusline, 4 hook).
+- **Decisions:**
+  - Tab info shape for the tab bar: `{ number, title, diff, exited }`, title already clean or nil. Task 10 passes `b:term_title` through `clean_title(title, { cmd = config.terminal_cmd })`.
+  - `render(tabs, active, width, max)` takes everything as arguments (not `render(win)`). `layout` returns items `{ kind = tab|sep|new|more_left|more_right, text, number, active, tab, limit }`. Task 10 computes the width and wires `winbar = %!v:lua...`.
+  - The click global is installed by `tabbar.install_click_handler()` (`_G.ClaudinhoTabClick = M.click`). Task 10 must call it and `tabbar.setup_highlights()`.
+  - `M.click` lazy-requires `claudinho.sessions` and calls `sessions.new()` or `sessions.activate(n)`; `sessions.lua` comes in Task 9, the spec stubs it through `package.loaded`.
+  - Cells are `" <label> "`, with the box bar between all items and before `+`. Overflow arrows are the items `" ‹ "` and `" › "`. Overflow fallback neighbours use limit 0 and are added right first, then left.
+  - `status.text` takes `{ model, effort, mode }` with the raw `permission_mode`; the display mapping lives in `status`. `from_hook` returns the raw `permission_mode` as `mode`.
+  - `decode` treats a table with `[1] ~= nil` as an array (nil); an empty table counts as an object.
+  - The modules use their own trim (the busted vim mock has no `vim.trim`/`vim.list_extend`); the spec fakes `vim.json.decode`. The mock's `strdisplaywidth` counts code points, so wide-character truncation is not covered by unit tests (manual check at Task 10). Glyphs are literal UTF-8, not `\u{}` escapes (Lua 5.1).
+  - Fix round 1 (quality-fixer): `status_spec` registered `it` inside a `pairs()` loop, rejected by the test-order helper; now an ordered array with `ipairs`.
+  - Checks (test-runner): `check` 0 warnings / 0 errors in 201 files; `format-check` green; `unit` (`BUSTED_SEED=12345 CI=true`) 1774 / 0 / 0 / 31 (648 s); `integration` (Neovim 0.12.3 through `mise exec`) 33 files, 525 passed, 1 failed: `tests/integration/claude_stub_spec.lua` ("is the first PATH entry"). It fails on `HEAD` without the Task 5 changes too (proved with the changes stashed) and passes in isolation (4 of 4); registered as a pre-existing bug in `docs/backlog/bugs/2026-11-16-claude-stub-path-first-entry-integration.md` (medium), with the user's approval to close the task.
+- **Assumptions:** `clean_title` drops the first token only when it has no ASCII letter or digit (so a non-ASCII first word, such as CJK, is dropped too); the generic command check compares the whole command, its first token and that token's basename, case-insensitive; the marks are `" ● diff"` and `" [exited]"` (the spec's English text wins over rule 14's `[encerrada]`).
+- **Approved scope:** none.
+- **Migrations / env vars:** none.
+- **Docs pending:** `ARCHITECTURE.md` (Task 20): `sources/session_data.lua`, `ui/status.lua`, `ui/tabbar.lua` and their pure-function contract.
+- **Manual checks (Task 10):** winbar clicks (left button on a tab and on `+`; other buttons ignored; `mouse=` disables clicks); light and dark colorschemes (groups link to `TabLineSel`, `TabLine`, `WarningMsg`, `Comment`, `TabLineFill`); a narrow window (shrink to numbers, then the `‹ ›` arrows keeping the active tab and `+`); a window narrower than the active tab plus `+`; CJK titles.

@@ -1,0 +1,6 @@
+{
+  "session_id": "s1",
+  "hook_event_name": "UserPromptSubmit",
+  "prompt": "hi",
+  "permission_mode": "acceptEdits"
+}
