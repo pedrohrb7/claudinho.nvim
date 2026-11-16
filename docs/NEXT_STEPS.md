@@ -1,6 +1,6 @@
 # Onde paramos
 
-Atualizado em 2026-11-15.
+Atualizado em 2026-11-16.
 
 ## Feito
 
@@ -14,6 +14,7 @@ Atualizado em 2026-11-15.
   - a Task 13 exige a integração verde localmente no Neovim 0.12.3 e no 0.12.0;
   - a matriz do CI passa a `["stable", "v0.12.0"]`.
 - `docs/features/base-ui/plan.md`: **Approved**, com dois adendos: idioma (textos visíveis do plugin em inglês) e Neovim mínimo 0.12.
+- `docs/features/base-ui/spec.md`: **In progress**, 22 tasks. O `/implement` roda em modo `--step`. Tasks 1-4 feitas (detalhe em `docs/features/base-ui/log.md`): linha de base de testes (cobertura 86,22%), servidor por instância, rotas HTTP de status e hook, lock file por aba com configurações de sessão e relay.
 - Agente de stack Lua: `lua` (`~/.claude/agents/lua.md`); a spec foi ajustada para esse nome em 2026-11-14.
 - Ambiente local: plenary.nvim instalado em `~/.local/share/nvim/site/pack/vendor/start/plenary.nvim`, no SHA do CI (`74b06c6c75e4eeb3108ec01852001636d85a932b`).
 
@@ -30,19 +31,31 @@ Tasks 1-14 feitas (detalhe em `docs/features/fork-limpo/log.md`):
 
 Gate final: unit 1630/0/0/28, integração 508 no 0.12.3 e no 0.12.0, cobertura 86,22%.
 
-Git recomeçado (Task 14, fechada pelo usuário em 2026-11-15 com o push de `892bacc`, CI em andamento): novo commit raiz `64f1422`, backup em `~/backups/claudecode-history.bundle`, saída da rede de forks do GitHub, remoto só com `main`.
+Git recomeçado (Task 14, fechada pelo usuário em 2026-11-15 com o push de `8487767`, antes `892bacc`; CI em andamento): novo commit raiz `64f1422`, backup em `~/backups/claudecode-history.bundle`, saída da rede de forks do GitHub, remoto só com `main`.
+
+## UI base: em andamento (2026-11-16)
+
+Tasks 1-4 de 22 feitas (detalhe em `docs/features/base-ui/log.md`):
+
+- linha de base de testes (cobertura 86,22%);
+- servidor WebSocket por instância;
+- rotas HTTP de status e hook;
+- lock file por aba, configurações de sessão e relay.
+
+Gate da Task 4: check 0 warnings, unit 1704/0/0/31, integração 526 passando no Neovim 0.12.3.
 
 ## Pendente (follow-ups do usuário)
 
-1. Confirmar o resultado do CI em `892bacc`.
+1. Confirmar o resultado do CI no push de `8487767` (antes `892bacc`).
 2. Ajustar as regras de branch que exigiam `covered-lock` e `pr-title`.
 3. Reinstalar o plugin na config do Neovim (o clone antigo do `vim.pack` não avança pro `main` reescrito).
-4. Tag `v0.1.0`, só com autorização do usuário (o `CHANGELOG.md` linka pra ela).
+4. Feito: a tag `v0.1.0` existe.
+5. Fazer o force-push de `main`, `develop` e `v0.1.0`: o histórico deles foi reescrito em 2026-11-16 para remover as linhas `Co-Authored-By` dos commits depois do commit raiz (`64f1422`, inalterado). Depois do push, os hashes nas docs que apontam para commits reescritos ficam desatualizados.
 
 ## Próximos passos
 
-1. Spec da base-ui (`docs/features/base-ui/plan.md` está Approved, ainda sem spec).
-2. Requisito do usuário (2026-11-15): quando a base-ui trocar todo `:ClaudeCode*` por `:Claudinho`, manter registro de onde o código veio: atribuição no README, `CHANGELOG.md` e `LICENSE`; as notas do upstream em `PROTOCOL.md` e `ARCHITECTURE.md`; e uma linha de proveniência em cada módulo reescrito.
+1. Task 5 da base-ui (dados da sessão, status e barra de abas, funções puras).
+2. Requisito do usuário (2026-11-15; cobertos pelas Tasks 16, 17, 19 e 20 da spec): quando a base-ui trocar todo `:ClaudeCode*` por `:Claudinho`, manter registro de onde o código veio: atribuição no README, `CHANGELOG.md` e `LICENSE`; as notas do upstream em `PROTOCOL.md` e `ARCHITECTURE.md`; e uma linha de proveniência em cada módulo reescrito.
 
 ## Lembretes
 
