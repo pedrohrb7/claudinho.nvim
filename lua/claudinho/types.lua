@@ -180,6 +180,16 @@
 ---@field config ClaudinhoConfig     -- the configuration the session was made with
 ---@field format_path (fun(file_path: string): string, boolean)|nil -- for the mention queue
 
+-- Where the selection tracking sends its updates: the default server facade or the router of claudinho.sessions
+---@class ClaudinhoSelectionRouter
+---@field broadcast fun(method: string, params: table?, on_written: function?): boolean
+
+-- The registry of the Claude tabs (lua/claudinho/sessions.lua)
+---@class ClaudinhoSessionsState
+---@field tabs table<integer, ClaudinhoSession>
+---@field active integer|nil
+---@field by_server table<integer, integer> -- server id -> tab number
+
 -- Server interface for main module
 ---@class ClaudinhoServerFacade
 ---@field start fun(config: ClaudinhoConfig, auth_token: string|nil): (success: boolean, port_or_error: number|string)

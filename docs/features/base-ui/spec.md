@@ -803,7 +803,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `lua/claudinho/sessions.lua`, `lua/claudinho/selection.lua`, `lua/claudinho/types.lua`, `tests/unit/sessions_spec.lua`, `tests/selection_test.lua`, `tests/integration/sessions_spec.lua`, `tests/helpers/**`, `tests/mocks/vim.lua`
 - **Depends on:** Task 6, Task 8
 - **Done when:** a tabela da seção 7 está aplicada, incluindo `setup_autocmds` (ainda não chamado pelo `init`) e o `router`; `selection.lua` aceita o router e reconhece `b:claudinho_session` sem mudar o comportamento atual; `sessions_spec` (unit e integração) e `selection_test` passam; gate verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 10 - Janela do Claude: layouts, winbar e statusline
 

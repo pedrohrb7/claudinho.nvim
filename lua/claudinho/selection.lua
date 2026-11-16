@@ -375,7 +375,8 @@ M.state = {
 }
 
 ---Enables selection tracking.
----@param server table The server object to use for communication.
+---@param server table Where the selections go: anything with a `broadcast(method, params)` function that returns
+---whether it sent them, such as the default server or the router of `claudinho.sessions`.
 ---@param visual_demotion_delay_ms number The delay for visual selection demotion.
 function M.enable(server, visual_demotion_delay_ms)
   if M.state.tracking_enabled then
@@ -1197,8 +1198,20 @@ end
 
 ---Sends the selection update to the Claude server.
 ---@param selection table The selection object to send.
+---@return boolean|nil sent What the server's broadcast answered
 function M.send_selection_update(selection)
-  M.server.broadcast("selection_changed", selection)
+  return M.server.broadcast("selection_changed", selection)
+end
+
+---Sends the latest recorded selection again, to whoever the server (or router) points at now. Used when the active
+---Claude tab changes, so the new tab knows what is selected.
+---@return boolean sent False when there is no selection, no server, or the broadcast reached nobody
+function M.resend_latest()
+  local selection = M.state.latest_selection
+  if not selection or not M.server then
+    return false
+  end
+  return M.send_selection_update(selection) == true
 end
 
 ---Whether a buffer is the Claude terminal, which selection tracking ignores.
@@ -1209,6 +1222,13 @@ end
 function M.is_claude_terminal_buffer(bufnr)
   if not vim.api.nvim_buf_is_valid(bufnr) then
     return false
+  end
+  -- The buffer of a Claude tab (claudinho.session) carries its number.
+  local tab_ok, tab_number = pcall(function()
+    return vim.b[bufnr].claudinho_session
+  end)
+  if tab_ok and tab_number ~= nil then
+    return true
   end
   -- A terminal buffer is named term://{cwd}//{pid}:{cmd}. Look for claude in the command
   -- only, so a shell started in a directory such as claudinho.nvim does not count.

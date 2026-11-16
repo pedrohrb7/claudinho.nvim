@@ -530,6 +530,70 @@ describe("Selection module", function()
     assert(type(selection.state.debounce_ms) == "number")
   end)
 
+  it("enables with a router that has no server behind it, and sends through it", function()
+    local sent = {}
+    local router = {
+      broadcast = function(method, params)
+        table.insert(sent, { method = method, params = params })
+        return false -- no running tab to send to
+      end,
+    }
+
+    selection.enable(router, 50)
+
+    assert(selection.state.tracking_enabled == true)
+    assert(router == selection.server)
+    selection.send_selection_update({ text = "x" })
+    assert.are.equal(1, #sent)
+    assert.are.equal("selection_changed", sent[1].method)
+    assert.are.same({ text = "x" }, sent[1].params)
+  end)
+
+  describe("resend_latest", function()
+    it("sends the latest selection through the server again and says it was sent", function()
+      local sent = {}
+      selection.enable({
+        broadcast = function(method, params)
+          table.insert(sent, { method = method, params = params })
+          return true
+        end,
+      })
+      selection.state.latest_selection = { text = "alpha" }
+
+      assert.is_true(selection.resend_latest())
+      assert.is_true(selection.resend_latest())
+
+      assert.are.equal(2, #sent)
+      assert.are.equal("selection_changed", sent[2].method)
+      assert.are.same({ text = "alpha" }, sent[2].params)
+    end)
+
+    it("says false when the router reaches nobody", function()
+      selection.enable({
+        broadcast = function()
+          return false
+        end,
+      })
+      selection.state.latest_selection = { text = "alpha" }
+
+      assert.is_false(selection.resend_latest())
+    end)
+
+    it("says false and sends nothing without a selection or without tracking", function()
+      assert.is_false(selection.resend_latest())
+
+      local calls = 0
+      selection.enable({
+        broadcast = function()
+          calls = calls + 1
+          return true
+        end,
+      })
+      assert.is_false(selection.resend_latest())
+      assert.are.equal(0, calls)
+    end)
+  end)
+
   it("should enable and disable tracking", function()
     selection.enable(mock_server)
 
@@ -2132,6 +2196,25 @@ describe("Range Selection Tests", function()
     end)
 
     describe("is_claude_terminal_buffer", function()
+      -- vim.b of this section's mock: buffer number -> its variables, put back after each test.
+      local real_b, stubbed
+      local function stub_buffer_vars(vars)
+        if not stubbed then
+          real_b, stubbed = _G.vim.b, true
+        end
+        _G.vim.b = setmetatable({}, {
+          __index = function(_, bufnr)
+            return vars[bufnr] or {}
+          end,
+        })
+      end
+      after_each(function()
+        if stubbed then
+          _G.vim.b = real_b
+          real_b, stubbed = nil, false
+        end
+      end)
+
       it("is true for a term:// buffer whose name contains claude", function()
         _G.vim.test.add_buffer(7, "term://~/proj//123:claude --model x", { "" })
         terminal_module.get_active_terminal_bufnr = function()
@@ -2164,6 +2247,25 @@ describe("Range Selection Tests", function()
           return 8
         end
         assert(selection.is_claude_terminal_buffer(11) == false)
+      end)
+
+      it("is true for the buffer of a Claude tab, whatever its name", function()
+        _G.vim.test.add_buffer(14, "term://~/proj//790:sh", { "" })
+        stub_buffer_vars({ [14] = { claudinho_session = 2 } })
+        terminal_module.get_active_terminal_bufnr = function()
+          return nil
+        end
+        assert(selection.is_claude_terminal_buffer(14) == true)
+      end)
+
+      it("is false for a buffer with no claudinho_session mark, also when another buffer has one", function()
+        _G.vim.test.add_buffer(15, "/path/to/other.lua", { "" })
+        _G.vim.test.add_buffer(16, "/path/to/test.lua", { "" })
+        stub_buffer_vars({ [15] = { claudinho_session = 1 } })
+        terminal_module.get_active_terminal_bufnr = function()
+          return nil
+        end
+        assert(selection.is_claude_terminal_buffer(16) == false)
       end)
 
       it("is false for a file buffer and for another terminal", function()
