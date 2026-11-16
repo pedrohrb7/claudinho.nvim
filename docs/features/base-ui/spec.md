@@ -1,7 +1,7 @@
 # UI base: janela do Claude com abas de sessão - spec técnica
 
 - **Date:** 2026-11-15
-- **Status:** Approved
+- **Status:** In progress
 - **Plan:** [plan.md](plan.md)
 - **Decisões de 2026-11-15:** as cinco Open questions da primeira versão desta spec foram decididas pelo usuário, todas com a recomendação, e registradas no [adendo (2) do plano](plan.md#addendum-2026-11-15-2-revisão-da-spec) (errata da regra 89 e regras 90 a 97); ver [Open questions](#open-questions).
 - **Implementation log:** [log.md](log.md)
@@ -739,7 +739,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** nenhum arquivo do repo (os números vão para `log.md`, escrito pelo `/implement`)
 - **Depends on:** -
 - **Done when:** o `log.md` registra, sobre o `HEAD` e com `BUSTED_SEED=12345 CI=true`: totais do `unit` (sucessos, falhas, erros, pendentes) e o tempo; warnings do `check`; cobertura total e por arquivo de `lua/claudinho/` e `plugin/` (`./.luarocks/bin/luacov` e `scripts/coverage-summary.sh luacov.report.out "$PWD"`); totais do `integration` no 0.12.3 (arquivos, passados); `claude --version`
-- **Status:** pending
+- **Status:** done
 
 ### Task 2 - Servidor por instância
 
