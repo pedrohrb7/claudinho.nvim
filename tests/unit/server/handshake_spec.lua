@@ -301,4 +301,70 @@ describe("WebSocket handshake authentication", function()
       assert.is_true(utils.constant_time_compare("", ""))
     end)
   end)
+
+  describe("POST requests", function()
+    local post = "POST /claudinho/hook HTTP/1.1\r\nHost: x\r\nContent-Length: 2\r\n\r\n{}"
+
+    it("is not a WebSocket endpoint request", function()
+      assert.is_false(handshake.is_websocket_endpoint(post))
+    end)
+
+    it("is refused by process_handshake when no HTTP handler takes it", function()
+      local success, response = handshake.process_handshake(post, nil)
+      assert.is_false(success)
+      assert.truthy(response:find("404", 1, true))
+    end)
+
+    it("does not reach the handshake when the client has an HTTP handler", function()
+      local client_manager = require("claudinho.server.client")
+      local spy_handshake = spy.on(handshake, "process_handshake")
+      local client = client_manager.create_client({})
+      local seen
+      client_manager.process_data(
+        client,
+        post,
+        function() end,
+        function() end,
+        function() end,
+        "token",
+        nil,
+        function(c)
+          seen = c.buffer
+        end
+      )
+
+      assert.spy(spy_handshake).was_not_called()
+      assert.equals(post, seen)
+      assert.equals("http", client.mode)
+      spy_handshake:revert()
+    end)
+
+    it("still upgrades a GET request when an HTTP handler is set", function()
+      local client_manager = require("claudinho.server.client")
+      local written = {}
+      local client = client_manager.create_client({
+        write = function(_, data)
+          table.insert(written, data)
+          return true
+        end,
+      })
+      local called = false
+      local request = table.concat({
+        "GET / HTTP/1.1",
+        "Upgrade: websocket",
+        "Connection: Upgrade",
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==",
+        "Sec-WebSocket-Version: 13",
+        "",
+        "",
+      }, "\r\n")
+      client_manager.process_data(client, request, function() end, function() end, function() end, nil, nil, function()
+        called = true
+      end)
+
+      assert.is_false(called)
+      assert.is_nil(client.mode)
+      assert.truthy(written[1]:find("101 Switching Protocols", 1, true))
+    end)
+  end)
 end)

@@ -755,7 +755,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `lua/claudinho/server/http.lua`, `lua/claudinho/server/client.lua`, `lua/claudinho/server/tcp.lua`, `lua/claudinho/server/init.lua`, `lua/claudinho/server/handshake.lua`, `lua/claudinho/types.lua`, `tests/unit/server/**`, `tests/integration/server_http_spec.lua`, `tests/helpers/http_post.lua`
 - **Depends on:** Task 2
 - **Done when:** a tabela de rotas da seção 1 está aplicada; `http_spec`, `handshake_spec` e `server_http_spec` passam; um POST não aparece em `get_status().clients`; gate verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 4 - Lock file por aba, settings da sessão e relay
 

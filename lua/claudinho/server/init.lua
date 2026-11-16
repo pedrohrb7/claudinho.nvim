@@ -88,6 +88,11 @@ function Server:start(config, auth_token)
     on_message = function(client, message)
       self:_handle_message(client, message)
     end,
+    on_post = function(kind, body)
+      if self.on_post then
+        self.on_post(kind, body)
+      end
+    end,
     on_connect = function(client)
       -- This runs at the TCP accept, before the handshake, so the token has not been checked yet.
       if self.auth_token then

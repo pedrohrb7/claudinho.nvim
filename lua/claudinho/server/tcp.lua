@@ -1,5 +1,6 @@
 ---@brief TCP server implementation using vim.loop
 local client_manager = require("claudinho.server.client")
+local http = require("claudinho.server.http")
 
 local M = {}
 
@@ -9,6 +10,8 @@ local M = {}
 ---@field auth_token string|nil The authentication token for validating connections
 ---@field id integer|nil Id of the server instance that owns this TCP server; each client gets it as `server_id`
 ---@field clients table<string, WebSocketClient> Table of connected clients
+---@field http_clients table<string, WebSocketClient> POST clients: not in `clients`, so never broadcast to nor counted
+---@field on_post fun(kind: "statusline"|"hook", body: string)|nil Callback for a POST that passed the token check
 ---@field on_message function Callback for WebSocket messages
 ---@field on_connect function Callback for new connections
 ---@field on_open function Callback for a client whose WebSocket handshake completed
@@ -153,6 +156,8 @@ function M.create_server(config, callbacks, auth_token, server_id)
     auth_token = auth_token,
     id = server_id,
     clients = {},
+    http_clients = {},
+    on_post = callbacks.on_post,
     on_message = callbacks.on_message or function() end,
     on_connect = callbacks.on_connect or function() end,
     on_open = callbacks.on_open or function() end,
@@ -207,6 +212,22 @@ function M._handle_new_connection(server)
   client.server_id = server.id
   server.clients[client.id] = client
 
+  -- A client whose request line is a POST leaves `clients` at once: it is no WebSocket client, so it is not counted,
+  -- broadcast to, pinged or reported as a disconnect. The server still owns its socket (`http_clients`).
+  local function on_http(cl)
+    if server.clients[cl.id] == cl then
+      server.clients[cl.id] = nil
+      server.http_clients[cl.id] = cl
+    end
+    http.handle(cl, {
+      token = server.auth_token,
+      on_post = server.on_post,
+      on_done = function(done)
+        server.http_clients[done.id] = nil
+      end,
+    })
+  end
+
   -- Set up data handler
   client_tcp:read_start(function(err, data)
     -- A client's failure is reported only as its disconnect reason, which the server logs at debug level. The
@@ -233,7 +254,7 @@ function M._handle_new_connection(server)
       M._disconnect_client(server, cl, code, reason)
     end, function(cl, error_msg)
       M._disconnect_client(server, cl, 1006, "Client error: " .. error_msg)
-    end, server.auth_token, server.on_open)
+    end, server.auth_token, server.on_open, on_http)
   end)
 
   -- Notify about the TCP connection. on_open follows once its WebSocket handshake completes.
@@ -277,6 +298,9 @@ function M._disconnect_client(server, client, code, reason)
 
   -- Idempotency: a client can hit multiple disconnect paths (e.g. CLOSE frame
   -- followed by a TCP EOF). Only notify/remove once.
+  if server.http_clients then
+    server.http_clients[client.id] = nil
+  end
   if not server.clients[client.id] then
     -- The server dropped this client already, perhaps by stopping before this event ran, and nothing else will close
     -- its socket.
@@ -501,6 +525,13 @@ function M.stop_server(server)
 
   -- Clear clients
   server.clients = {}
+
+  for _, client in pairs(server.http_clients or {}) do
+    if not client.tcp_handle:is_closing() then
+      client.tcp_handle:close()
+    end
+  end
+  server.http_clients = {}
 
   -- Close server
   if server.server and not server.server:is_closing() then

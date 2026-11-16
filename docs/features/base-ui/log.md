@@ -67,3 +67,25 @@ Mode: `--step` (pause after each task; commit each task with the user's approval
 - **Approved scope:** none.
 - **Migrations / env vars:** none.
 - **Docs pending:** `ARCHITECTURE.md` and `CLAUDE.md` (Tasks 18 and 20): the server instance API (`M.new`, `for_client`, `drain`), `client.server_id`, the per-instance stop.
+
+### Task 3 - Rotas HTTP de status e hooks (done)
+
+- **Files:**
+  - New `lua/claudinho/server/http.lua`: POST parser and router; answers 204/400/401/404/413, closes the socket after the write, then calls `on_post(kind, body)` inside a `pcall`. Exports `M.TOKEN_HEADER` (`x-claudinho-token`), `MAX_HEADER_BYTES` (8192, counting the final CRLFCRLF), `MAX_BODY_BYTES` (1 MiB) and `create_response`.
+  - `lua/claudinho/server/client.lua`: `process_data` takes an 8th argument `on_http`; a request line starting with `POST ` sets `client.mode = "http"` and hands the buffer to `on_http` before the handshake. `M.write` (raw write); `mode`/`http` annotations.
+  - `lua/claudinho/server/tcp.lua`: `create_server` accepts `callbacks.on_post` and keeps `server.http_clients`; on the first POST bytes the client moves from `clients` to `http_clients`; `_disconnect_client` and `stop_server` clean `http_clients` (stop closes their sockets).
+  - `lua/claudinho/server/init.lua`: the tcp callbacks gain `on_post`, forwarding to `self.on_post` (`opts.on_post` of `M.new`).
+  - New `tests/unit/server/http_spec.lua` (23 cases: routes, token, limits, a POST client outside `clients`); `tests/unit/server/handshake_spec.lua` +4 (a POST is not a WebSocket endpoint; a POST skips the handshake when `on_http` is set; a GET with `on_http` still upgrades); new `tests/integration/server_http_spec.lua` (4 real-socket cases, pending under busted); new `tests/helpers/http_post.lua` (raw POST over `vim.uv`: `build`, `send`, `post`; returns status, raw bytes, closed flag, elapsed ms).
+- **Decisions:**
+  - Without `on_http` a POST still goes down the handshake path and gets the old 404, so the WebSocket protocol and its callers are unchanged.
+  - The first 1-4 bytes of a connection wait until the verb is known (a prefix of `POST ` returns early); fewer than 5 bytes of anything else are decided on the next read.
+  - Check order once the headers arrive: 404 (path or method), 401 (token), 400 (`Content-Length` missing or not a number), 413 (over 1 MiB). It answers without reading the body. Chunked bodies are not supported: the relay (Task 4) must always send `Content-Length`. Bytes after the declared body are ignored (no keep-alive).
+  - POST clients live in `server.http_clients`, so ping, broadcast, `get_status` and `on_disconnect` never see them.
+  - The 204 goes out before `on_post` runs, inside the libuv callback: the session (Task 8) must wrap its handler in `vim.schedule`.
+  - A server without a token (`auth_token` nil) accepts POSTs without a token check, like the WebSocket path; real sessions always have one.
+  - Checks (test-runner): `check` 0 warnings / 0 errors in 190 files; `format-check` green; `unit` (`BUSTED_SEED=12345 CI=true`) 1677 / 0 / 0 / 30 (622 s); `integration` (Neovim 0.12.3 through `mise exec`) 32 files, 517 passed, 0 failed, 0 errors. The agent expected 1678, but `http_spec` has 23 cases, not 24 (counted by the main session with busted TAP: `http_spec` 23, `handshake_spec` 18 -> 22); no test was lost. The runner's note that the integration ran on 0.12.6 came from the system `nvim` it queried outside mise; the script runs mise's 0.12.3.
+- **Assumptions:** chunked bodies unsupported; no keep-alive.
+- **Approved scope:** none.
+- **Migrations / env vars:** none.
+- **Docs pending:** `PROTOCOL.md` and `ARCHITECTURE.md` (Task 20): the two POST routes, the `X-Claudinho-Token` header, status codes and limits, `client.mode = "http"`, `server.http_clients`, `on_post`. `CLAUDE.md` (Task 18): `server/http.lua` in the server module list.
+- **Review note:** security-relevant (a new local HTTP endpoint with token auth); include `security-reviewer` in the end-of-feature review.

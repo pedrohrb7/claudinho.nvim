@@ -28,6 +28,8 @@ local CLOSE_REASONS = {
 ---@field pending table|nil The reads of an incomplete frame, with their total length in `size` and the frame's in `needed`
 ---@field fragments table|nil Joined pieces of the text message whose last fragment has not arrived, and their total `size`
 ---@field handshake_complete boolean Whether WebSocket handshake is complete
+---@field mode "http"|nil Set from the request line: "http" for a POST client, which never becomes a WebSocket client
+---@field http table|nil State of the HTTP request being read (see server/http.lua)
 ---@field close_pending boolean|nil True while a Close frame waits to be written: its write callback closes the socket, or its deadline does
 ---@field close_timer table|nil The deadline of the Close frame: a repeating timer that runs while `close_pending` is set
 ---@field keepalive_timeout number|nil The window in milliseconds for a pong and for write progress, from the server's ping interval
@@ -96,6 +98,15 @@ local function write(client, data, callback)
     end
   end
   return queued, err
+end
+
+---Write raw bytes to the socket of a client, as every write does.
+---@param client WebSocketClient
+---@param data string
+---@param callback function? function(err)
+---@return any queued, string|nil err
+function M.write(client, data, callback)
+  return write(client, data, callback)
 end
 
 ---Stop the deadline of the Close frame. Safe to call when none runs.
@@ -211,7 +222,9 @@ end
 ---@param on_error function Callback for errors: function(client, error_msg)
 ---@param auth_token string|nil Expected authentication token for validation
 ---@param on_open function|nil Callback once the WebSocket handshake completed: function(client)
-function M.process_data(client, data, on_message, on_close, on_error, auth_token, on_open)
+---@param on_http function|nil Callback for a client whose request line starts with `POST `: function(client). It reads
+---`client.buffer`. Without it a POST goes down the handshake path and is refused there.
+function M.process_data(client, data, on_message, on_close, on_error, auth_token, on_open, on_http)
   -- Nothing more is parsed from a client that is closing, so none of its bytes are kept either.
   if client.state == "closing" or client.state == "closed" then
     client.buffer, client.pending = "", nil
@@ -231,6 +244,22 @@ function M.process_data(client, data, on_message, on_close, on_error, auth_token
     client.buffer = table.concat(pending)
   else
     client.buffer = client.buffer .. data
+  end
+
+  if not client.handshake_complete and on_http then
+    -- The request line decides before the handshake: a POST is an HTTP client for good.
+    if not client.mode then
+      local prefix = client.buffer:sub(1, 5)
+      if prefix == "POST " then
+        client.mode = "http"
+      elseif #client.buffer < 5 and ("POST "):sub(1, #client.buffer) == client.buffer then
+        return -- Too short to tell
+      end
+    end
+    if client.mode == "http" then
+      on_http(client)
+      return
+    end
   end
 
   if not client.handshake_complete then
