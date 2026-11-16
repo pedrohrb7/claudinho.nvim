@@ -779,7 +779,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `lua/claudinho/config.lua`, `lua/claudinho/notify.lua`, `lua/claudinho/types.lua`, `tests/unit/config_spec.lua`, `tests/config_test.lua`, `tests/unit/notify_spec.lua`, `tests/mocks/vim.lua`
 - **Depends on:** Task 1
 - **Done when:** as chaves novas da seção 4 existem com padrão e validação com queda no padrão e erro exato; `notify.lua` segue a tabela de classes; nenhuma chave antiga muda; `config_spec` e `notify_spec` passam; gate verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 7 - Fila de @-mentions por instância
 

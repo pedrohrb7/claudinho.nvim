@@ -136,3 +136,22 @@ Mode: `--step`, same gate policy as the 2026-11-15 run. The run state `.claude/r
 - **Migrations / env vars:** none.
 - **Docs pending:** `ARCHITECTURE.md` (Task 20): `sources/session_data.lua`, `ui/status.lua`, `ui/tabbar.lua` and their pure-function contract.
 - **Manual checks (Task 10):** winbar clicks (left button on a tab and on `+`; other buttons ignored; `mouse=` disables clicks); light and dark colorschemes (groups link to `TabLineSel`, `TabLine`, `WarningMsg`, `Comment`, `TabLineFill`); a narrow window (shrink to numbers, then the `‹ ›` arrows keeping the active tab and `+`); a window narrower than the active tab plus `+`; CJK titles.
+
+### Task 6 - Config nova e notificações (done)
+
+- **Files:**
+  - `lua/claudinho/config.lua`: new defaults `window`, `keymaps` and `notify`; public `normalize_new_keys`, run only by `apply`, falls back to the default with the exact error through `notify.error` (no assert). `validate()` is unchanged; no old key changes.
+  - New `lua/claudinho/notify.lua`: `info` (only when the plugin state has `config.notify == true`, once through `notify_once`, optional level override), `reply` (WARN), `error` (ERROR); title `Claudinho`.
+  - `lua/claudinho/types.lua`: `ClaudinhoConfig` gains `window`, `keymaps`, `notify`; new `ClaudinhoWindowConfig` and `ClaudinhoKeymapsConfig`.
+  - Tests: `tests/unit/config_spec.lua` (new defaults, valid values, each invalid key as an `ipairs` array, a non-table `window`; 30), `tests/config_test.lua` (+2: defaults and fallback), new `tests/unit/notify_spec.lua` (8). `tests/mocks/vim.lua` unchanged.
+  - `docs/backlog/bugs/README.md`: Index table aligned by treefmt (the row added after the Task 5 gate went into `2568f84` unformatted).
+- **Decisions:**
+  - `notify.info` reads the plugin state without loading the plugin: `package.loaded["claudinho"].state.config.notify == true`; plugin not loaded or no config means off.
+  - `config.lua` requires `claudinho.notify` lazily inside `normalize_new_keys` (no require cycle).
+  - Error value text: strings quoted, others through `tostring`; "using <default>" is the default's `tostring` (`0.3`, `0.8`, `24`, `false`, and `nil` for `diff_width`). A non-table `window`, `right`, `bottom`, `float` or `keymaps` reports `<key> = <v> is not valid; using the default <key>.`
+  - `window.tab_title_max` must be an integer >= 1.
+  - Checks (test-runner): `check` 0 warnings / 0 errors in 203 files; `format-check` green after the backlog Index fix (299 traversed, 0 changed); `unit` (`BUSTED_SEED=12345 CI=true`) 1798 / 0 / 0 / 31 (636 s); `integration` (Neovim 0.12.3 through `mise exec`) 33 files, 525 passed, 1 failed: only the known `claude_stub_spec` bug (`docs/backlog/bugs/2026-11-16-claude-stub-path-first-entry-integration.md`).
+- **Assumptions:** the spec gives the exact text only for the generic template; the formats for non-numeric and non-table values above are the agent's reading. An unset `diff_width` stays nil; an invalid explicit value reports "using nil.".
+- **Approved scope:** none.
+- **Migrations / env vars:** none.
+- **Docs pending:** `README.md` and `README.en.md` (Task 17): the `window`, `keymaps` and `notify` keys and defaults. `CHANGELOG.md` Unreleased (Task 19): the new keys and `notify.lua`.

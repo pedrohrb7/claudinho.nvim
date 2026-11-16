@@ -131,6 +131,19 @@
 ---@field disable_broadcast_debouncing? boolean
 ---@field enable_broadcast_debouncing_in_tests? boolean
 ---@field terminal ClaudinhoTerminalConfig?
+---@field window ClaudinhoWindowConfig
+---@field keymaps ClaudinhoKeymapsConfig
+---@field notify boolean Informative notifications (errors and replies always show)
+
+---@class ClaudinhoWindowConfig
+---@field layout "right"|"bottom"|"float"|"tab"
+---@field right { width: number, diff_width: number|nil }
+---@field bottom { height: number }
+---@field float { width: number, height: number }
+---@field tab_title_max integer
+
+---@class ClaudinhoKeymapsConfig
+---@field preset boolean
 
 ---@class (partial) PartialClaudinhoConfig: ClaudinhoConfig
 

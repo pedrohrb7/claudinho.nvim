@@ -353,5 +353,127 @@ describe("Configuration", function()
     expect(tostring(err)).to_match("must be a string or function")
   end)
 
+  describe("new keys (window, keymaps, notify)", function()
+    local original_notify
+    local notes
+
+    before_each(function()
+      original_notify = vim.notify
+      notes = {}
+      vim.notify = function(msg, level, opts)
+        table.insert(notes, { msg = msg, level = level, opts = opts })
+      end
+    end)
+
+    after_each(function()
+      vim.notify = original_notify
+    end)
+
+    it("has the defaults and raises no error", function()
+      local c = config.apply({})
+      expect(c.window.layout).to_be("right")
+      expect(c.window.right.width).to_be(0.30)
+      expect(c.window.right.diff_width).to_be_nil()
+      expect(c.window.bottom.height).to_be(0.30)
+      expect(c.window.float.width).to_be(0.80)
+      expect(c.window.float.height).to_be(0.80)
+      expect(c.window.tab_title_max).to_be(24)
+      expect(c.keymaps.preset).to_be_false()
+      expect(c.notify).to_be_false()
+      expect(#notes).to_be(0)
+    end)
+
+    it("keeps valid user values", function()
+      local c = config.apply({
+        window = { layout = "float", right = { width = 0.5, diff_width = 0.6 }, tab_title_max = 10 },
+        keymaps = { preset = true },
+        notify = true,
+      })
+      expect(c.window.layout).to_be("float")
+      expect(c.window.right.width).to_be(0.5)
+      expect(c.window.right.diff_width).to_be(0.6)
+      expect(c.window.bottom.height).to_be(0.30)
+      expect(c.window.tab_title_max).to_be(10)
+      expect(c.keymaps.preset).to_be_true()
+      expect(c.notify).to_be_true()
+      expect(#notes).to_be(0)
+    end)
+
+    it("falls back to right on an invalid layout, with the exact error", function()
+      local c = config.apply({ window = { layout = "sidebar" } })
+      expect(c.window.layout).to_be("right")
+      expect(#notes).to_be(1)
+      expect(notes[1].msg).to_be(
+        '[Claudinho] window.layout = "sidebar" is not valid; using "right". Valid layouts: right, bottom, float, tab.'
+      )
+      expect(notes[1].level).to_be(vim.log.levels.ERROR)
+      expect(notes[1].opts.title).to_be("Claudinho")
+    end)
+
+    local invalid = {
+      {
+        user = { window = { right = { width = 1.5 } } },
+        msg = "[Claudinho] window.right.width = 1.5 is not valid; using 0.3.",
+      },
+      {
+        user = { window = { right = { width = "wide" } } },
+        msg = '[Claudinho] window.right.width = "wide" is not valid; using 0.3.',
+      },
+      {
+        user = { window = { right = { diff_width = 0 } } },
+        msg = "[Claudinho] window.right.diff_width = 0 is not valid; using nil.",
+      },
+      {
+        user = { window = { bottom = { height = 1 } } },
+        msg = "[Claudinho] window.bottom.height = 1 is not valid; using 0.3.",
+      },
+      {
+        user = { window = { float = { width = -0.1 } } },
+        msg = "[Claudinho] window.float.width = -0.1 is not valid; using 0.8.",
+      },
+      {
+        user = { window = { float = { height = true } } },
+        msg = "[Claudinho] window.float.height = true is not valid; using 0.8.",
+      },
+      {
+        user = { window = { tab_title_max = 0 } },
+        msg = "[Claudinho] window.tab_title_max = 0 is not valid; using 24.",
+      },
+      {
+        user = { window = { tab_title_max = 2.5 } },
+        msg = "[Claudinho] window.tab_title_max = 2.5 is not valid; using 24.",
+      },
+      {
+        user = { keymaps = { preset = "yes" } },
+        msg = '[Claudinho] keymaps.preset = "yes" is not valid; using false.',
+      },
+      { user = { notify = 1 }, msg = "[Claudinho] notify = 1 is not valid; using false." },
+    }
+
+    for i, case in ipairs(invalid) do
+      it("falls back to the default with the exact error: case " .. i, function()
+        local c = config.apply(case.user)
+        expect(#notes).to_be(1)
+        expect(notes[1].msg).to_be(case.msg)
+        expect(notes[1].level).to_be(vim.log.levels.ERROR)
+        expect(c.notify).to_be_false()
+        expect(c.window.right.width).to_be(0.30)
+        expect(c.window.bottom.height).to_be(0.30)
+        expect(c.window.float.width).to_be(0.80)
+        expect(c.window.float.height).to_be(0.80)
+        expect(c.window.tab_title_max).to_be(24)
+        expect(c.window.right.diff_width).to_be_nil()
+        expect(c.keymaps.preset).to_be_false()
+      end)
+    end
+
+    it("replaces a non-table window and keeps the rest of the config", function()
+      local c = config.apply({ window = "x", log_level = "debug" })
+      expect(c.window.layout).to_be("right")
+      expect(c.log_level).to_be("debug")
+      expect(#notes).to_be(1)
+    end)
+  end)
+
   teardown()
 end)

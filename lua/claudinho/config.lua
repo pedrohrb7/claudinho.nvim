@@ -40,6 +40,18 @@ M.defaults = {
     { name = "Claude Haiku (Latest)", value = "haiku" },
     { name = "Default (account recommended)", value = "default" },
   },
+  window = {
+    layout = "right", -- "right", "bottom", "float" or "tab"
+    right = {
+      width = 0.30, -- fraction of the editor width, in (0, 1)
+      diff_width = nil, -- nil, or a fraction in (0, 1): width while a diff is open
+    },
+    bottom = { height = 0.30 },
+    float = { width = 0.80, height = 0.80 },
+    tab_title_max = 24, -- longest tab title in the winbar, in columns
+  },
+  keymaps = { preset = false },
+  notify = false, -- informative notifications (errors and replies always show)
   -- Keep a minimal terminal config here instead of requiring claudinho.terminal
   -- during config.apply(). Loading the terminal module pulls in the server/main
   -- module graph and makes coverage-enabled config validation unexpectedly slow.
@@ -267,6 +279,110 @@ function M.validate(config)
   return true
 end
 
+local VALID_LAYOUTS = { "right", "bottom", "float", "tab" }
+
+---Text of a value in an error message: strings quoted, the rest as tostring.
+---@param value any
+---@return string
+local function show(value)
+  if type(value) == "string" then
+    return '"' .. value .. '"'
+  end
+  return tostring(value)
+end
+
+---@param value any
+---@return boolean
+local function is_fraction(value)
+  return type(value) == "number" and value > 0 and value < 1
+end
+
+---@param value any
+---@return boolean
+local function is_boolean(value)
+  return type(value) == "boolean"
+end
+
+---@param value any
+---@return boolean
+local function is_positive_integer(value)
+  return type(value) == "number" and value >= 1 and value % 1 == 0
+end
+
+---Checks the keys added by the base UI (window, keymaps, notify). A bad value does not raise: it falls back to the
+---default and reports an error naming the key, the value and the valid ones. Mutates `config`.
+---@param config table
+function M.normalize_new_keys(config)
+  local defaults = M.defaults
+  local notify = require("claudinho.notify")
+
+  ---Replaces a bad table with a copy of the default, with the error of the key.
+  local function ensure_table(parent, key, path, default)
+    if type(parent[key]) ~= "table" then
+      if parent[key] ~= nil then
+        notify.error(
+          "[Claudinho] " .. path .. " = " .. show(parent[key]) .. " is not valid; using the default " .. path .. "."
+        )
+      end
+      parent[key] = vim.deepcopy(default)
+    end
+    return parent[key]
+  end
+
+  local function check(parent, key, path, default, valid)
+    local value = parent[key]
+    if value == nil and default ~= nil then
+      parent[key] = default
+    elseif value ~= nil and not valid(value) then
+      notify.error("[Claudinho] " .. path .. " = " .. show(value) .. " is not valid; using " .. show(default) .. ".")
+      parent[key] = default
+    end
+  end
+
+  local window = ensure_table(config, "window", "window", defaults.window)
+  local d = defaults.window
+
+  if window.layout == nil then
+    window.layout = d.layout
+  else
+    local ok = false
+    for _, layout in ipairs(VALID_LAYOUTS) do
+      ok = ok or window.layout == layout
+    end
+    if not ok then
+      notify.error(
+        "[Claudinho] window.layout = "
+          .. show(window.layout)
+          .. ' is not valid; using "right". Valid layouts: '
+          .. table.concat(VALID_LAYOUTS, ", ")
+          .. "."
+      )
+      window.layout = d.layout
+    end
+  end
+
+  local right = ensure_table(window, "right", "window.right", d.right)
+  check(right, "width", "window.right.width", d.right.width, is_fraction)
+  if right.diff_width ~= nil and not is_fraction(right.diff_width) then
+    notify.error("[Claudinho] window.right.diff_width = " .. show(right.diff_width) .. " is not valid; using nil.")
+    right.diff_width = nil
+  end
+
+  local bottom = ensure_table(window, "bottom", "window.bottom", d.bottom)
+  check(bottom, "height", "window.bottom.height", d.bottom.height, is_fraction)
+
+  local float = ensure_table(window, "float", "window.float", d.float)
+  check(float, "width", "window.float.width", d.float.width, is_fraction)
+  check(float, "height", "window.float.height", d.float.height, is_fraction)
+
+  check(window, "tab_title_max", "window.tab_title_max", d.tab_title_max, is_positive_integer)
+
+  local keymaps = ensure_table(config, "keymaps", "keymaps", defaults.keymaps)
+  check(keymaps, "preset", "keymaps.preset", defaults.keymaps.preset, is_boolean)
+
+  check(config, "notify", "notify", defaults.notify, is_boolean)
+end
+
 ---Applies user configuration on top of default settings and validates the result.
 ---@param user_config table|nil The user-provided configuration table.
 ---@return ClaudinhoConfig config The final, validated configuration table.
@@ -285,6 +401,7 @@ function M.apply(user_config)
     end
   end
 
+  M.normalize_new_keys(config)
   M.validate(config)
 
   return config
