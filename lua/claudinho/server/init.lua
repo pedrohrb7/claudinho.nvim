@@ -114,9 +114,9 @@ function Server:start(config, auth_token)
 
       -- The client completed its WebSocket handshake, so it can take the queued @ mentions now.
       local main_module = require("claudinho")
-      if main_module.process_mention_queue then
+      if main_module.default_queue then
         vim.schedule(function()
-          main_module.process_mention_queue(true)
+          main_module.default_queue():on_open()
         end)
       end
     end,

@@ -155,3 +155,25 @@ Mode: `--step`, same gate policy as the 2026-11-15 run. The run state `.claude/r
 - **Approved scope:** none.
 - **Migrations / env vars:** none.
 - **Docs pending:** `README.md` and `README.en.md` (Task 17): the `window`, `keymaps` and `notify` keys and defaults. `CHANGELOG.md` Unreleased (Task 19): the new keys and `notify.lua`.
+
+### Task 7 - Fila de @-mentions por instância (done)
+
+- **Files:**
+  - New `lua/claudinho/mention_queue.lua` (origin line first): the queue code moved out of `init.lua`; `Queue.new({ server, config, format_path? })` with `send`, `enqueue`, `on_open`, `flush`, `clear`, `is_connected`, `ready_in` (plus private `_format`, `_queue`, `_expire`, `_schedule_flush`, `_start_timer`, `_stop_timer`).
+  - `lua/claudinho/init.lua`: the queue functions, `process_mention_queue` and `format_mention` removed; `M.default_queue()` returns a queue bound to the default server and is used for send, clear and `is_claude_connected`.
+  - `lua/claudinho/server/init.lua`: the default `on_open` calls `default_queue():on_open()`.
+  - `lua/claudinho/types.lua`: `mention_queue`, `mention_timer` and `connection_timer` removed from `ClaudinhoState`.
+  - Tests: `tests/unit/mention_queue_spec.lua` (46 -> 49 cases: state reads through `default_queue()`, module added to the reload list, 3 new `Queue.new` cases with two isolated queues); `tests/unit/at_mention_edge_cases_spec.lua` (24, reads the queue through `default_queue()`).
+- **Decisions:**
+  - `Queue.new` takes an optional `format_path` (default identity). `init` passes `M._format_path_for_at_mention` dynamically, because `add_command_spec` stubs and asserts that function.
+  - The default queue's server is an adapter that reads `M.state.server` on each call: `broadcast` forwards to `M.state.server.broadcast(...)`, `get_status` to `server/init`. Specs that replace `claudinho.state.server` with a mock keep working.
+  - `default_queue()` refreshes `queue.config` from `M.state.config` on every call (setup and tests replace it).
+  - `flush` no longer asserts that the server is up: a stopped server makes `broadcast` return false and the mention waits or expires; `stop()` still clears the queue.
+  - `M.process_mention_queue` removed now (the spec lists it for removal in Task 12; only `server/init` called it).
+  - `queue.mentions`, `queue.mention_timer` and `queue.connection_timer` replace the `M.state` fields.
+  - Checks (test-runner): `check` 0 warnings / 0 errors in 204 files; `format-check` green (0 changed); `unit` (`BUSTED_SEED=12345 CI=true`) 1801 / 0 / 0 / 31 (674 s; +3, the new isolated-queue cases; no case lost); `integration` (Neovim 0.12.3 through `mise exec`) 33 files, 525 passed, 1 failed: only the known `claude_stub_spec` bug.
+  - The agent ran `busted tests/unit/server` (whole directory, 266 successes) as a narrow check; the workflow hook logged it as a deviation.
+- **Assumptions:** extra public methods beyond the spec's list (`enqueue`) are acceptable.
+- **Approved scope:** none.
+- **Migrations / env vars:** none.
+- **Docs pending:** `ARCHITECTURE.md` and `CLAUDE.md` (Tasks 18 and 20): `mention_queue.lua` in the structure list; the queue is per server instance and `init` uses the default one until Task 12.

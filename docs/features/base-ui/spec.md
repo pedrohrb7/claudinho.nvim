@@ -787,7 +787,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `lua/claudinho/mention_queue.lua`, `lua/claudinho/init.lua`, `lua/claudinho/server/init.lua`, `lua/claudinho/types.lua`, `tests/unit/mention_queue_spec.lua`, `tests/unit/at_mention_spec.lua`, `tests/unit/at_mention_edge_cases_spec.lua`, `tests/unit/init_spec.lua`, `tests/unit/send_complete_event_spec.lua`, `tests/unit/focus_after_send_spec.lua`, `tests/unit/add_command_spec.lua`, `tests/unit/send_command_spec.lua`, `tests/unit/directory_at_mention_spec.lua`, `tests/unit/tree_send_visual_spec.lua`, `tests/unit/tree_buffer_classification_spec.lua`, `tests/selection_test.lua`
 - **Depends on:** Task 2
 - **Done when:** a seção 5 está aplicada, com a linha de origem em `mention_queue.lua`; o `init` usa uma fila ligada ao servidor padrão; os mesmos casos de hoje passam, mais o de duas filas isoladas; a contagem do `unit` é a da Task 2 mais os casos novos; gate verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 8 - Sessão: processo, servidor, lock file e settings
 

@@ -205,7 +205,7 @@ describe("At Mention Edge Cases", function()
       }
       init_module.state.server = { broadcast = function() end }
       init_module.state.config = { connection_timeout = 10000, connection_wait_delay = 600 }
-      init_module.state.mention_queue = {}
+      init_module.default_queue():clear()
       init_module.is_claude_connected = function()
         return false
       end
@@ -213,12 +213,12 @@ describe("At Mention Edge Cases", function()
 
     after_each(function()
       package.loaded["claudinho.terminal"] = nil
-      init_module.state.connection_timer = nil
+      init_module.default_queue():clear()
     end)
 
     it("queues the absolute path, so a later :cd cannot change the file", function()
       expect(init_module.send_at_mention("src/file.lua", 1, 2)).to_be_true()
-      local queued = init_module.state.mention_queue[1]
+      local queued = init_module.default_queue().mentions[1]
       expect(queued.file_path).to_be("/Users/test/project/src/file.lua")
       expect(queued.start_line).to_be(1)
       expect(queued.end_line).to_be(2)
@@ -227,7 +227,7 @@ describe("At Mention Edge Cases", function()
 
     it("queues a directory with a trailing slash and no line numbers", function()
       init_module.send_at_mention("/Users/test/project/lua", 1, 2)
-      local queued = init_module.state.mention_queue[1]
+      local queued = init_module.default_queue().mentions[1]
       expect(queued.file_path).to_be("/Users/test/project/lua/")
       expect(queued.start_line).to_be_nil()
       expect(queued.end_line).to_be_nil()
@@ -237,7 +237,7 @@ describe("At Mention Edge Cases", function()
       local success, err = init_module.send_at_mention("", 1, 2)
       expect(success).to_be_false()
       assert_contains(err, "file_path must be a non-empty string")
-      expect(#init_module.state.mention_queue).to_be(0)
+      expect(#init_module.default_queue().mentions).to_be(0)
       expect(opened).to_be(0)
     end)
   end)
