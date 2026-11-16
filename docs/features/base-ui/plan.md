@@ -2,10 +2,11 @@
 
 - **Date:** 2026-11-12
 - **Status:** Approved
-- **Spec:** [spec.md](spec.md) <!-- once written -->
+- **Spec:** [spec.md](spec.md)
 - **Addendum 2026-11-12:** rótulos e mensagens do plugin em inglês, pela decisão de idioma da Fase 0 ([fork-limpo](../fork-limpo/plan.md)). Ver [Addendum](#addendum-2026-11-12-idioma-da-interface).
 - **Addendum 2026-11-12:** Neovim mínimo 0.12, decidido no `docs/PRD.md` e aplicado pela Fase 0 ([fork-limpo](../fork-limpo/plan.md)). Ver [Addendum](#addendum-2026-11-12-neovim-mínimo-012).
 - **Addendum 2026-11-15:** registro da origem do código, o bloqueio do claudecode.nvim vira aviso, mecanismo das chaves removidas, release `0.2.0` na entrega, notificações informativas desligadas por padrão, layout só pela config (sai o `:Claudinho layout`) e esclarecimento sobre o que persiste entre reinícios. Ver [Addendum](#addendum-2026-11-15-origem-do-código-claudecodenvim-notificações-layout-e-release).
+- **Addendum 2026-11-15 (2):** revisão da spec: errata da regra 85 repetida (a da seção 5 passa a ser a 89), `autoConnectIde` aceito e documentado, opções de diretório removidas, dois Neovims na mesma pasta documentados e o critério "nada muda fora das sessões do plugin" medido com o stub. Ver [Addendum](#addendum-2026-11-15-2-revisão-da-spec).
 
 ## Goal
 
@@ -423,3 +424,69 @@ A regra 25 (no `float`, a janela se esconde quando um diff abre) continua valend
 ### 7. Esclarecimento: o que persiste entre reinícios
 
 Não muda nenhuma regra. O preset de atalhos (regra 69) e o layout (regra 85) vêm só da config do usuário e são aplicados pelo `setup()` em todo início do Neovim, então persistem entre reinícios enquanto estiverem na config. Não existe mais escolha em tempo de execução que se perde ao sair; só as abas morrem com o Neovim, como o **Out of scope** já diz.
+
+## Addendum 2026-11-15 (2): revisão da spec
+
+Origem: a [spec](spec.md) (Draft) deixou cinco perguntas em **Open questions**, e o usuário decidiu todas em 2026-11-15, com as recomendações da spec. As regras novas continuam a numeração do plano, a partir da 90. O texto aprovado acima não foi reescrito: onde ele e este adendo divergem, vale este adendo. Depois deste adendo, o plano não tem pergunta em aberto.
+
+### 1. Errata: duas regras 85
+
+Corrige a numeração do adendo de 2026-11-15, que tem duas regras com o número 85 (spec, Open question 5). A numeração que vale é a que a spec já usa:
+
+| Regra no texto acima                                              | Começa com                                                                      | Número que vale     |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------- |
+| 85 da seção 5 ("Notificações informativas desligadas por padrão") | "Um aviso que responde a um comando do usuário que não fez o que ele pediu ..." | **89**              |
+| 85 da seção 6 ("Layout só pela config")                           | "O layout da janela vem só da config ..."                                       | **85** (não muda)   |
+| 86 a 88 da seção 6                                                | -                                                                               | 86 a 88 (não mudam) |
+
+Nenhuma citação muda: "regra 89" nas regras 81 e 82 já é a regra das respostas a comandos do usuário, e "regra 85" na seção 7 já é a de layout. Não existe outra regra 89. O adendo de 2026-11-15 fica com as regras 72 a 89, cada número uma vez.
+
+### 2. `autoConnectIde`: aceito e documentado
+
+Muda a regra 62, o caso de borda de `autoConnectIde`, o risco de `autoConnectIde`, o caso de borda "Os dois plugins ativos" da seção 2 do adendo de 2026-11-15 e o critério de sucesso "Nada muda fora das sessões do plugin" (item 5). Spec, Open question 1, opção (a). Nada muda no código.
+
+Fato conferido pela spec no Claude Code CLI 2.1.325 (fato F6): com `autoConnectIde` ligado em `~/.claude.json`, com `claude --ide` ou com `CLAUDE_CODE_AUTO_CONNECT_IDE=1`, um claude aberto fora do Neovim se conecta sozinho quando exatamente um lock file de `~/.claude/ide/` tem uma pasta que contém a cwd dele. O CLI não lê nenhum campo do lock file que tire a aba da conexão automática e a mantenha selecionável no `/ide`. `autoConnectIde` vem desligado por padrão no CLI.
+
+90. A primeira frase da regra 62 ("uma sessão externa nunca se conecta sozinha ao servidor de uma aba") vale com a conexão automática do CLI desligada, que é o padrão: `autoConnectIde` desligado, sem `--ide` e sem `CLAUDE_CODE_AUTO_CONNECT_IDE=1`. Com uma dessas opções ligada pelo próprio usuário, um claude externo pode se conectar sozinho a uma aba quando a pasta dela é a única, entre os lock files de `~/.claude/ide/`, que contém a cwd dele. O plugin aceita esse comportamento e não tenta impedi-lo. O resto da regra 62 (as variáveis de ambiente só no processo de cada aba) não muda.
+91. Uma sessão externa conectada sozinha pela regra 90 é cliente da aba como na regra 63: recebe a seleção quando a aba está ativa, os diffs dela seguem as regras da aba, e fechar ou encerrar a aba a desconecta sem encerrá-la.
+92. Os dois READMEs explicam que, com `autoConnectIde`, `--ide` ou `CLAUDE_CODE_AUTO_CONNECT_IDE=1`, um claude aberto fora do Neovim pode se conectar sozinho a uma aba, e como evitar: `CLAUDE_CODE_AUTO_CONNECT_IDE=0` numa sessão, ou `autoConnectIde` desligado.
+
+Casos de borda e risco que mudam:
+
+| Situação                                                                                                         | Comportamento esperado                                                                                                                                                                                                                                  |
+| ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sessão externa com `autoConnectIde` ligado em `~/.claude.json` (ou `--ide`, ou `CLAUDE_CODE_AUTO_CONNECT_IDE=1`) | Substitui o caso do plano. Quando a pasta de exatamente uma aba contém a cwd dela, ela se conecta sozinha a essa aba (regra 90) e segue a regra 63 (regra 91). Em qualquer outro caso, só um `/ide` explícito conecta. Documentado no README (regra 92) |
+| Os dois plugins ativos, `/ide` num claude aberto fora do Neovim                                                  | Substitui a parte "nenhuma conecta sozinha (regra 62)" da seção 2 do adendo de 2026-11-15 por "nenhuma conecta sozinha com a conexão automática desligada (regras 62 e 90)"                                                                             |
+
+| Risco                                                                                                                   | Impacto                                                                                                                                          | Mitigação                                                                                                                       |
+| ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `autoConnectIde` (ou `--ide`, ou `CLAUDE_CODE_AUTO_CONNECT_IDE=1`) faz uma sessão externa se conectar sozinha a uma aba | Substitui o risco do plano. Só afeta quem ligou a opção, que existe para isso; com o padrão do CLI, o isolamento das regras 61 e 62 vale inteiro | Comportamento aceito (regra 90) e documentado no README com o jeito de desligar (regra 92); a sessão conectada segue a regra 63 |
+
+### 3. Opções de diretório removidas
+
+Complementa as regras 4, 71 e 77. Spec, Open question 2, opção (a).
+
+93. As opções `terminal.cwd`, `terminal.git_repo_cwd` e `terminal.cwd_provider` e os aliases do topo `cwd`, `git_repo_cwd` e `cwd_provider` deixam de existir: uma aba nova sempre inicia no `getcwd()` da janela atual (regra 4), e nenhuma opção muda isso.
+94. As seis chaves entram na tabela de chaves removidas das regras 71 e 77, com o aviso de sempre: nomeia a chave e diz o que a substitui (a aba nova inicia no diretório atual do Neovim, `:pwd`), e o resto da config funciona. O aviso é informativo (regra 81): aparece só com a opção `notify` da regra 80 ligada, e o `:checkhealth claudinho` sempre o mostra como aviso (regra 83).
+95. O módulo `cwd.lua` sai, com os testes dele. Os READMEs tiram essas opções da config e as listam entre as chaves removidas.
+
+### 4. Dois Neovims na mesma pasta
+
+Resolve o caso de borda "Dois Neovims abertos, cada um com uma aba 1" e a parte da regra 7 que deixava o formato do nome para a spec conferir. Spec, Open question 3, opção (a).
+
+Fato conferido pela spec (fato F5): o `/ide` usa o `ideName` do lock file como rótulo e, quando duas entradas disponíveis têm o mesmo nome, mostra as pastas de cada uma como descrição. Dentro de uma aba, o `/ide` lista só as abas do próprio Neovim.
+
+96. O nome da aba no `/ide` continua `Neovim (Claudinho <n>)`, sem pasta nem PID acrescentados.
+97. Os dois READMEs registram o caso: num claude aberto fora do Neovim, dois Neovims com abas de mesmo número mostram a pasta de cada uma no `/ide`, e na mesma pasta as duas linhas ficam iguais. Dentro de uma aba, o `/ide` lista só as abas do próprio Neovim, então lá elas não se confundem.
+
+| Situação                                    | Comportamento esperado                                                                                                                                                                                                                                                                            |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dois Neovims abertos, cada um com uma aba 1 | Substitui o caso do plano. No `/ide` de um claude externo, as duas aparecem como `Neovim (Claudinho 1)`, com a pasta de cada uma como descrição; na mesma pasta, as linhas ficam iguais, o que é aceito e documentado (regras 96 e 97). No `/ide` de uma aba, só aparecem as abas do mesmo Neovim |
+
+### 5. Critério "Nada muda fora das sessões do plugin"
+
+Muda esse critério de sucesso do **Goal**. Spec, Open question 4. A regra 57 não muda: o plugin continua sem escrever em nenhum dos três lugares. Só a medição muda, porque o próprio CLI regrava `~/.claude.json` a cada início (spec, fato F10), com ou sem o plugin.
+
+| Critério                             | Como medir                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nada muda fora das sessões do plugin | Testes automatizados com um `claude` stub provam que o plugin não escreve em `~/.claude/settings.json`, `~/.claude.json` nem em `.claude/` do projeto (mesmo checksum antes e depois de abrir, usar e fechar abas). Com o CLI real, o roteiro manual do usuário confere só os checksums de `~/.claude/settings.json` e de `.claude/` do projeto. Com a conexão automática do CLI desligada (padrão), um claude externo não se conecta sozinho a nenhuma aba (regras 62 e 90) |

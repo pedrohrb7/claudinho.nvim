@@ -18,5 +18,5 @@ One folder per feature or technical change, named `<slug>/` (kebab-case, no date
 
 | Feature                          | Plan        | Spec        | Updated    |
 | -------------------------------- | ----------- | ----------- | ---------- |
-| [base-ui](base-ui/plan.md)       | Approved    | -           | 2026-11-12 |
+| [base-ui](base-ui/plan.md)       | Approved    | Approved    | 2026-11-15 |
 | [fork-limpo](fork-limpo/plan.md) | Implemented | Implemented | 2026-11-15 |
