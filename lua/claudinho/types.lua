@@ -134,6 +134,11 @@
 
 ---@class (partial) PartialClaudinhoConfig: ClaudinhoConfig
 
+-- Options of lockfile.create
+---@class ClaudinhoLockfileOpts
+---@field ide_name string|nil            -- the `ideName` of the lock file (default "Neovim")
+---@field workspace_folders string[]|nil -- the `workspaceFolders` (default: cwd plus the LSP folders)
+
 -- Server interface for main module
 ---@class ClaudinhoServerFacade
 ---@field start fun(config: ClaudinhoConfig, auth_token: string|nil): (success: boolean, port_or_error: number|string)

@@ -763,7 +763,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `lua/claudinho/lockfile.lua`, `lua/claudinho/session_settings.lua`, `lua/claudinho/sources/relay.lua`, `lua/claudinho/types.lua`, `tests/lockfile_test.lua`, `tests/unit/session_settings_spec.lua`, `tests/unit/sources/relay_spec.lua`, `tests/integration/relay_spec.lua`
 - **Depends on:** Task 3
 - **Done when:** a seção 2 está aplicada; `lockfile_test`, `session_settings_spec`, `relay_spec` (unit e integração) passam; o tempo médio do relay medido em `relay_spec` está no log; gate verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 5 - Dados da sessão, status e barra de abas (funções puras)
 

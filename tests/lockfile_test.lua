@@ -505,6 +505,88 @@ describe("Lockfile Module", function()
     end)
   end)
 
+  describe("get_workspace_folders(cwd)", function()
+    after_each(function()
+      vim.lsp = {}
+    end)
+
+    it("should use the given folder in place of the working directory", function()
+      vim.fn.getcwd = function()
+        return "/mock/cwd"
+      end
+
+      local folders = lockfile.get_workspace_folders("/mock/tab")
+
+      assert(1 == #folders)
+      assert("/mock/tab" == folders[1])
+    end)
+
+    it("should add the LSP folders after the given folder and skip a repeat of it", function()
+      vim.lsp = {
+        get_clients = function()
+          return {
+            {
+              config = {
+                workspace_folders = { { uri = "file:///mock/tab" }, { uri = "file:///mock/lsp" } },
+              },
+            },
+          }
+        end,
+      }
+
+      local folders = lockfile.get_workspace_folders("/mock/tab")
+
+      assert(2 == #folders)
+      assert("/mock/tab" == folders[1])
+      assert("/mock/lsp" == folders[2])
+    end)
+  end)
+
+  describe("create() options", function()
+    local function read_lock(port)
+      local file = assert(io.open(lockfile.lock_dir .. "/" .. port .. ".lock", "r"))
+      local content = file:read("*a")
+      file:close()
+      return content
+    end
+
+    before_each(function()
+      vim.fn.getcwd = function()
+        return "/mock/cwd"
+      end
+      vim.lsp = {}
+    end)
+
+    after_each(function()
+      lockfile.remove(12401)
+      lockfile.remove(12402)
+    end)
+
+    it("should write the given ide_name and workspace_folders", function()
+      local created = lockfile.create(12401, "tab-token-0123456789", {
+        ide_name = "Neovim (Claudinho 2)",
+        workspace_folders = { "/mock/tab", "/mock/lsp" },
+      })
+
+      assert(created == true)
+      local content = read_lock(12401)
+      assert(content:find('"ideName":"Neovim (Claudinho 2)"', 1, true), content)
+      assert(content:find('"/mock/tab"', 1, true), content)
+      assert(content:find('"/mock/lsp"', 1, true), content)
+      assert(not content:find("/mock/cwd", 1, true), content)
+      assert(content:find('"transport":"ws"', 1, true), content)
+    end)
+
+    it("should keep today's defaults without options", function()
+      local created = lockfile.create(12402, "tab-token-0123456789")
+
+      assert(created == true)
+      local content = read_lock(12402)
+      assert(content:find('"ideName":"Neovim"', 1, true), content)
+      assert(content:find('"/mock/cwd"', 1, true), content)
+    end)
+  end)
+
   describe("lock directory", function()
     it("should stay inside the private test home whatever CLAUDE_CONFIG_DIR is", function()
       -- The suite creates, reads and removes lock files. A lock_dir outside `home` would make it write into the

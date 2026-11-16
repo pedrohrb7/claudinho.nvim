@@ -78,10 +78,11 @@ end
 ---Create the lock file for a specified WebSocket port
 ---@param port number The port number for the WebSocket server
 ---@param auth_token? string Optional pre-generated auth token (generates new one if not provided)
+---@param opts? ClaudinhoLockfileOpts `ide_name` (default "Neovim") and `workspace_folders` (default `get_workspace_folders()`)
 ---@return boolean success Whether the operation was successful
 ---@return string result_or_error The lock file path if successful, or error message if failed
 ---@return string? auth_token The authentication token if successful
-function M.create(port, auth_token)
+function M.create(port, auth_token, opts)
   if not port or type(port) ~= "number" then
     return false, "Invalid port number"
   end
@@ -105,7 +106,9 @@ function M.create(port, auth_token)
 
   local lock_path = M.lock_dir .. "/" .. port .. ".lock"
 
-  local workspace_folders = M.get_workspace_folders()
+  opts = opts or {}
+  local workspace_folders = opts.workspace_folders or M.get_workspace_folders()
+  local ide_name = opts.ide_name or "Neovim"
   if not auth_token then
     local auth_success, auth_result = pcall(generate_auth_token)
     if not auth_success then
@@ -129,7 +132,7 @@ function M.create(port, auth_token)
   local lock_content = {
     pid = vim.fn.getpid(),
     workspaceFolders = workspace_folders,
-    ideName = "Neovim",
+    ideName = ide_name,
     transport = "ws",
     authToken = auth_token,
   }
@@ -301,12 +304,13 @@ local function get_lsp_clients()
 end
 
 ---Get workspace folders for the lock file
+---@param cwd? string The folder of the session; defaults to the current working directory
 ---@return table Array of workspace folder paths
-function M.get_workspace_folders()
+function M.get_workspace_folders(cwd)
   local folders = {}
 
-  -- Add current working directory
-  table.insert(folders, vim.fn.getcwd())
+  -- Add the session folder (the current working directory when none is given)
+  table.insert(folders, cwd or vim.fn.getcwd())
 
   -- Get LSP workspace folders if available
   local clients = get_lsp_clients()

@@ -89,3 +89,22 @@ Mode: `--step` (pause after each task; commit each task with the user's approval
 - **Migrations / env vars:** none.
 - **Docs pending:** `PROTOCOL.md` and `ARCHITECTURE.md` (Task 20): the two POST routes, the `X-Claudinho-Token` header, status codes and limits, `client.mode = "http"`, `server.http_clients`, `on_post`. `CLAUDE.md` (Task 18): `server/http.lua` in the server module list.
 - **Review note:** security-relevant (a new local HTTP endpoint with token auth); include `security-reviewer` in the end-of-feature review.
+
+### Task 4 - Lock file por aba, settings da sessão e relay (done)
+
+- **Files:**
+  - `lua/claudinho/lockfile.lua`: `create(port, token, opts)` takes `opts.ide_name` (default `"Neovim"`) and `opts.workspace_folders` (default `get_workspace_folders()`); `get_workspace_folders(cwd)` puts the tab folder first, then the LSP folders, without duplicates.
+  - `lua/claudinho/types.lua`: `ClaudinhoLockfileOpts`.
+  - New `lua/claudinho/session_settings.lua`: `relay_path()` (absolute, from the module's own source path), `build(progpath, relay)` (pure table builder), `write(session)` (sets `session.settings_path`, returns the path or nil and an error; file mode 0600, opened with `wx`), `remove(session)` (clears `settings_path`; deletes only a path ending in `.claudinho-<n>.json`, never anything else under `~/.claude`).
+  - New `lua/claudinho/sources/relay.lua`: `parse_port`, `build_request`, `main(kind, deps)` and the `nvim -l` entry point.
+  - Tests: `tests/lockfile_test.lua` +4 (33 -> 37); new `tests/unit/session_settings_spec.lua` (12); new `tests/unit/sources/relay_spec.lua` (11); new `tests/integration/relay_spec.lua` (9, pending under busted; real `nvim --clean -l` child processes against a real server instance, including an empty PATH, a dead port, a server that never answers and a wrong token).
+- **Decisions:**
+  - `relay.main(kind, deps)` takes optional `deps` (`getenv`, `read_stdin`, `write_stdout`, `send`) so unit specs run it with no network or stdio. Exit code is always 0; everything runs inside `pcall`.
+  - The relay reads stdin and writes the statusline newline before checking the port; without a valid port nothing is sent. It sends `Content-Length`, `X-Claudinho-Token`, `Content-Type: application/json` and `Connection: close`, and waits up to `relay.TIMEOUT_MS = 500` for the answer or the close.
+  - The settings unit spec fakes `vim.uv` and `vim.json` (the busted mock has neither); the 0600 mode is asserted on the `fs_open` call.
+  - Relay time: average 11.4 ms (agent run) and 11.6 ms (gate run) over 10 child-process runs, round trip included, on Neovim 0.12.3 (F4 measured 9.7 to 12.1 ms). Every run under 2000 ms.
+  - Checks (test-runner): `check` 0 warnings / 0 errors in 195 files; `format-check` green; `unit` (`BUSTED_SEED=12345 CI=true`) 1704 / 0 / 0 / 31 (635 s); `integration` (Neovim 0.12.3 through `mise exec`) 33 files, 526 passed, 0 failed, 0 errors.
+- **Assumptions:** the settings file name uses `session.number` (the `ClaudinhoSession` annotation of section 6); a missing token still sends the POST without the header (the server answers 401, which the relay ignores).
+- **Approved scope:** none.
+- **Migrations / env vars:** `CLAUDINHO_PORT` and `CLAUDINHO_TOKEN`, read by the relay; the session sets them in the tab process (Task 8).
+- **Docs pending:** `ARCHITECTURE.md` and `PROTOCOL.md` (Task 20): per-tab lock file fields, the settings file, the relay script and its exit-0 contract. `CLAUDE.md` (Task 18): `session_settings.lua` and `sources/relay.lua` in the structure list.
