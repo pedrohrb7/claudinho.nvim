@@ -152,6 +152,34 @@
 ---@field ide_name string|nil            -- the `ideName` of the lock file (default "Neovim")
 ---@field workspace_folders string[]|nil -- the `workspaceFolders` (default: cwd plus the LSP folders)
 
+-- A diff of a tab in the background, waiting for the tab to become active
+---@class ClaudinhoPendingDiff
+---@field tab_name string
+---@field path string
+---@field co thread The coroutine of the tool call; resumed with "reject" when the session closes
+
+-- One Claude session: the content of one tab (lua/claudinho/session.lua)
+---@class ClaudinhoSession
+---@field number integer
+---@field cwd string                 -- getcwd() of the window at creation (rules 4 and 8)
+---@field base_cmd string            -- config.terminal_cmd or "claude"
+---@field state "running"|"exited"
+---@field buf integer|nil
+---@field job integer|nil
+---@field pid integer|nil
+---@field exit_code integer|nil
+---@field server table|nil           -- ClaudinhoServer of server/init.lua
+---@field token string|nil
+---@field lock_port integer|nil
+---@field settings_path string|nil
+---@field data { session_id?: string, model?: string, effort?: string, mode?: string }
+---@field title string|nil           -- clean_title of b:term_title
+---@field pending_diffs ClaudinhoPendingDiff[]
+---@field queue ClaudinhoMentionQueue|nil
+---@field closing boolean
+---@field config ClaudinhoConfig     -- the configuration the session was made with
+---@field format_path (fun(file_path: string): string, boolean)|nil -- for the mention queue
+
 -- Server interface for main module
 ---@class ClaudinhoServerFacade
 ---@field start fun(config: ClaudinhoConfig, auth_token: string|nil): (success: boolean, port_or_error: number|string)

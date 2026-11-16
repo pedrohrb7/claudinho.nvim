@@ -177,3 +177,28 @@ Mode: `--step`, same gate policy as the 2026-11-15 run. The run state `.claude/r
 - **Approved scope:** none.
 - **Migrations / env vars:** none.
 - **Docs pending:** `ARCHITECTURE.md` and `CLAUDE.md` (Tasks 18 and 20): `mention_queue.lua` in the structure list; the queue is per server instance and `init` uses the default one until Task 12.
+
+### Task 8 - Sessão: processo, servidor, lock file e settings (done)
+
+- **Files:**
+  - New `lua/claudinho/session.lua` (origin line first, upstream `terminal.lua`): `M.new(number, config, opts?)`, `M.start(s, extra_args?)`, `M.restart(s)`, `M.close(s, reason?)`; env building, `on_post` merge into `session.data`, process-exit handling, `TermEnter` guard. No command uses it yet.
+  - `lua/claudinho/types.lua`: `ClaudinhoSession` and `ClaudinhoPendingDiff`.
+  - Tests: new `tests/unit/session_spec.lua` (52, fakes for server, lockfile, settings, queue and the Neovim API); new `tests/integration/session_spec.lua` (9, real Neovim, pending under busted); new `tests/helpers/tab_env.lua` (private `CLAUDE_CONFIG_DIR`/`HOME`, an idle test command that writes its env to a file, an exit-code command, env reader, cleanup). `tests/mocks/vim.lua` unchanged.
+- **Decisions:**
+  - `start`/`restart` return `false` plus `"Cannot start Claude <n>: ..."` and never call `notify`; the caller (Task 9/12) shows it, so there is no double notification.
+  - The job runs from an argv list (`utils.parse_command(base_cmd)` + `--settings <path>` + the parsed `extra_args`), not a shell string, which keeps bracketed aliases such as `opus[1m]` intact. `extra_args` is the spec's shell-escaped suffix with a leading space; `shell_split` reads it back.
+  - The server is created with `on_open` and `on_post` only, both wrapped in `vim.schedule`; `on_disconnect` is left to the server's own diff cleanup.
+  - Env built in `session.lua`: plugin vars (`CLAUDINHO_PORT`, `CLAUDINHO_TOKEN` and the others of section 6), then `config.env`, then the `no_proxy`/`NO_PROXY` loopback merge (copied from `terminal.lua`, rewritten in Task 12). `vim.env` is never touched.
+  - Reports to `claudinho.sessions` go through `pcall(require)`: `on_change` when a POST changed data, `on_exit` when the process ends. A silent no-op until Task 9; Task 9 owns the "Claude <n> exited" notification.
+  - Buffer unlisted (`nvim_create_buf(false, false)`), `bufhidden=hide`, `b:claudinho_session`, `filetype=claudinho`.
+  - Process end (`handle_exit` through `vim.schedule`) is ignored while closing or when the job id is not `session.job`. It sets `state`/`exit_code`, clears the queue, empties `pending_diffs` and releases server, lock and settings; the buffer stays. A buffer-local `TermEnter` autocmd (group `ClaudinhoSession`) schedules `stopinsert` on an exited session.
+  - `restart`: on success every window showing the old buffer gets the new one, and the old buffer is deleted after the new `jobstart`; on failure the session stays exited with its old buffer. `data` is kept; the new server's queue replaces the old one.
+  - `close` order: reject waiting diffs (`coroutine.resume(co, "reject")`), `close_diffs_for_client` for each handshaken client (only if `claudinho.diff` is loaded), `server:drain(200)`, `queue:clear`, `jobstop` plus a wait for `TermClose` up to 1000 ms (skipped when `jobstop` returns 0), release (server stop, lock remove, settings remove), buffer delete.
+  - Integration specs point `lockfile.lock_dir` at a temp folder (it is read once at module load).
+  - Fix round (LuaLS warnings in the new file, no behavior change): `---@cast port integer` after the server start check; `server --[[@as ClaudinhoMentionServer]]` at the `Queue.new` call. `lua-language-server --check` (warning level) clean.
+  - Checks (test-runner): `check` 0 warnings / 0 errors in 208 files; `format-check` green (0 changed); `unit` (`BUSTED_SEED=12345 CI=true`) 1853 / 0 / 0 / 32 (674 s; +52 and +1 pending); `integration` (Neovim 0.12.3 through `mise exec`) 34 files, 534 passed, 1 failed: only the known `claude_stub_spec` bug; `session_spec` 9/9.
+- **Assumptions:** a pending diff's coroutine is resumed with the string `"reject"` (Task 11 must accept it); a never-started session starts in state `exited`, so `restart` on it starts it; "a mensagem certa sai" is the returned error text, not a notification.
+- **Approved scope:** none.
+- **Migrations / env vars:** `CLAUDINHO_PORT` and `CLAUDINHO_TOKEN` are now set in the tab job env (read by the relay since Task 4).
+- **Docs pending:** `ARCHITECTURE.md` and `CLAUDE.md` (Tasks 18 and 20): `session.lua` in the structure list; lifecycle (all-or-nothing start, process exit, restart, close order); env vars only in the job env; job started from argv, not a shell. `CHANGELOG.md` Unreleased (Task 19): the per-tab session module (internal).
+- **Manual checks (Task 10):** a key typed in an ended terminal, rechecked with a real window (the integration case only checks the buffer stays valid and the mode is not terminal).

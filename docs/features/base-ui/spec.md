@@ -795,7 +795,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `lua/claudinho/session.lua`, `lua/claudinho/types.lua`, `tests/unit/session_spec.lua`, `tests/integration/session_spec.lua`, `tests/helpers/tab_env.lua`, `tests/mocks/vim.lua`
 - **Depends on:** Task 4, Task 5, Task 7
 - **Done when:** a seção 6 está aplicada, com a linha de origem; `session_spec` (unit e integração) passa; nenhum comando usa a sessão ainda; gate verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 9 - Abas: registro, aba ativa, roteamento e encerramento
 
