@@ -747,7 +747,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `lua/claudinho/server/init.lua`, `lua/claudinho/server/client.lua`, `lua/claudinho/server/tcp.lua`, `lua/claudinho/server/mock.lua`, `lua/claudinho/tools/init.lua`, `lua/claudinho/types.lua`, `tests/unit/server_spec.lua`, `tests/unit/server/**`, `tests/server_test.lua`, `tests/integration/server_instances_spec.lua`, `tests/helpers/ws_client.lua`, `tests/mocks/vim.lua`
 - **Depends on:** Task 1
 - **Done when:** a seção 1 (API de instância) está aplicada; `stop()` remove só as próprias respostas adiadas e rejeita só os diffs dos próprios clientes; `instances_spec` e `server_instances_spec` passam; os specs de servidor existentes passam sem mudar asserções de protocolo; `check`, `unit`, `format` e `integration` verdes
-- **Status:** pending
+- **Status:** done
 
 ### Task 3 - Rotas HTTP de status e hooks
 

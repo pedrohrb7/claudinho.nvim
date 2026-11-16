@@ -12,31 +12,65 @@ local islist = vim.islist or vim.tbl_islist
 
 local M = {}
 
----@class ServerState
----@field server table|nil The TCP server instance
----@field port number|nil The port server is running on
----@field auth_token string|nil The authentication token for validating connections
----@field handlers table Message handlers by method name
----@field ping_timer table|nil Timer for sending pings
-M.state = {
-  server = nil,
-  port = nil,
-  auth_token = nil,
-  handlers = {},
-  ping_timer = nil,
-}
+---@class ClaudinhoServer
+---@field id integer Unique in this Neovim (1, 2, ...)
+---@field port integer|nil
+---@field auth_token string|nil
+---@field tcp TCPServer|nil The object of server/tcp.lua
+---@field ping_timer uv.uv_timer_t|nil
+---@field deferred table<string, true> Keys this instance put in _G.claude_deferred_responses
+---@field handlers table<string, function> JSON-RPC handlers by method name
+---@field on_open fun(client: WebSocketClient)|nil A client finished its WebSocket handshake
+---@field on_disconnect fun(client: WebSocketClient)|nil
+---@field on_post fun(kind: "statusline"|"hook", body: string)|nil Used by the HTTP routes (Task 3)
+local Server = {}
+Server.__index = Server
 
----Initialize the WebSocket server
+local next_id = 0
+---@type table<integer, ClaudinhoServer> The running instances by id, for M.for_client
+local running = {}
+
+---Create a server instance. It listens only after :start.
+---@param opts { on_open: function|nil, on_disconnect: function|nil, on_post: function|nil }|nil
+---@return ClaudinhoServer
+function M.new(opts)
+  opts = opts or {}
+  next_id = next_id + 1
+  return setmetatable({
+    id = next_id,
+    port = nil,
+    auth_token = nil,
+    tcp = nil,
+    ping_timer = nil,
+    deferred = {},
+    handlers = {},
+    on_open = opts.on_open,
+    on_disconnect = opts.on_disconnect,
+    on_post = opts.on_post,
+  }, Server)
+end
+
+---The running instance that owns the client, by the mark the TCP layer put on it at accept.
+---@param client table|nil
+---@return ClaudinhoServer|nil
+function M.for_client(client)
+  if type(client) ~= "table" or client.server_id == nil then
+    return nil
+  end
+  return running[client.server_id]
+end
+
+---Start listening
 ---@param config ClaudinhoConfig Configuration options
 ---@param auth_token string|nil The authentication token for validating connections
 ---@return boolean success Whether server started successfully
 ---@return number|string port_or_error Port number or error message
-function M.start(config, auth_token)
-  if M.state.server then
+function Server:start(config, auth_token)
+  if self.tcp then
     return false, "Server already running"
   end
 
-  M.state.auth_token = auth_token
+  self.auth_token = auth_token
 
   -- Log authentication state
   if auth_token then
@@ -46,17 +80,17 @@ function M.start(config, auth_token)
     logger.debug("server", "Starting WebSocket server WITHOUT authentication (insecure)")
   end
 
-  M.register_handlers()
+  self:register_handlers()
 
-  tools.setup(M)
+  tools.setup(self)
 
   local callbacks = {
     on_message = function(client, message)
-      M._handle_message(client, message)
+      self:_handle_message(client, message)
     end,
     on_connect = function(client)
       -- This runs at the TCP accept, before the handshake, so the token has not been checked yet.
-      if M.state.auth_token then
+      if self.auth_token then
         logger.debug("server", "WebSocket client connected, awaiting authentication:", client.id)
       else
         logger.debug("server", "WebSocket client connected (no auth):", client.id)
@@ -64,8 +98,13 @@ function M.start(config, auth_token)
     end,
     on_open = function(client)
       -- With a token, the handshake has passed the token check by now, so the client is authenticated.
-      if M.state.auth_token then
+      if self.auth_token then
         logger.debug("server", "Authenticated WebSocket client connected:", client.id)
+      end
+
+      if self.on_open then
+        self.on_open(client)
+        return
       end
 
       -- The client completed its WebSocket handshake, so it can take the queued @ mentions now.
@@ -99,68 +138,103 @@ function M.start(config, auth_token)
           end)
         end)
       end
+
+      if self.on_disconnect then
+        self.on_disconnect(client)
+      end
     end,
     on_error = function(error_msg)
       logger.one_line("error", "server", error_msg)
     end,
   }
 
-  local server, error_msg = tcp_server.create_server(config, callbacks, M.state.auth_token)
-  if not server then
+  local tcp, error_msg = tcp_server.create_server(config, callbacks, self.auth_token, self.id)
+  if not tcp then
     return false, error_msg or "Unknown server creation error"
   end
 
-  M.state.server = server
-  M.state.port = server.port
+  self.tcp = tcp
+  self.port = tcp.port
+  running[self.id] = self
 
-  M.state.ping_timer = tcp_server.start_ping_timer(server, 30000) -- Start ping timer to keep connections alive
+  self.ping_timer = tcp_server.start_ping_timer(tcp, 30000) -- Start ping timer to keep connections alive
 
-  return true, server.port
+  return true, tcp.port
 end
 
----Stop the WebSocket server
+---Stop the server. It touches only its own deferred responses and the diffs of its own clients.
 ---@return boolean success Whether server stopped successfully
 ---@return string|nil error_message Error message if any
-function M.stop()
-  if not M.state.server then
+function Server:stop()
+  if not self.tcp then
     return false, "Server not running"
   end
 
-  if M.state.ping_timer then
-    M.state.ping_timer:stop()
-    M.state.ping_timer:close()
-    M.state.ping_timer = nil
+  if self.ping_timer then
+    self.ping_timer:stop()
+    self.ping_timer:close()
+    self.ping_timer = nil
   end
 
-  -- Reject any still-pending diffs before teardown -- stop_server bypasses
-  -- on_disconnect (#248). Pending only, so saved-but-unflushed edits survive;
-  -- only if the diff module is in use, and while clients can still receive
-  -- DIFF_REJECTED.
+  -- Reject the still-pending diffs of this server's clients before teardown -- stop_server bypasses on_disconnect
+  -- (#248). Pending only, so saved-but-unflushed edits survive; only if the diff module is in use, and while clients
+  -- can still receive DIFF_REJECTED. A client without a handshake ran no tool, so it owns no diff.
   local diff = package.loaded["claudinho.diff"]
   if diff then
-    diff.close_pending_diffs("server stopping")
+    for _, client in pairs(self.tcp.clients) do
+      if client.handshake_complete then
+        diff.close_diffs_for_client(client.id, "server stopping")
+      end
+    end
   end
 
-  tcp_server.stop_server(M.state.server)
+  tcp_server.stop_server(self.tcp)
 
-  -- CRITICAL: Clear global deferred responses to prevent memory leaks and hanging
+  -- CRITICAL: drop this instance's deferred responses to prevent memory leaks and hanging. Another instance's stay.
   if _G.claude_deferred_responses then
-    _G.claude_deferred_responses = {}
+    for key in pairs(self.deferred) do
+      _G.claude_deferred_responses[key] = nil
+    end
   end
+  self.deferred = {}
 
-  M.state.server = nil
-  M.state.port = nil
-  M.state.auth_token = nil
+  running[self.id] = nil
+  self.tcp = nil
+  self.port = nil
+  self.auth_token = nil
   return true
+end
+
+---Wait until the write queue of every client is empty.
+---@param timeout_ms integer|nil How long to wait at most (default 1000)
+---@return boolean drained True when every queue was empty before the timeout
+function Server:drain(timeout_ms)
+  local function empty()
+    if not self.tcp then
+      return true
+    end
+    for _, client in pairs(self.tcp.clients) do
+      local handle = client.tcp_handle
+      if handle and not handle:is_closing() and handle:get_write_queue_size() > 0 then
+        return false
+      end
+    end
+    return true
+  end
+  if empty() then
+    return true
+  end
+  vim.wait(timeout_ms or 1000, empty, 10)
+  return empty()
 end
 
 ---Handle incoming WebSocket message
 ---@param client table The client that sent the message
 ---@param message string The JSON-RPC message
-function M._handle_message(client, message)
+function Server:_handle_message(client, message)
   local success, parsed = pcall(vim.json.decode, message)
   if not success then
-    M.send_response(client, nil, nil, {
+    self:send_response(client, nil, nil, {
       code = -32700,
       message = "Parse error",
       data = "Invalid JSON",
@@ -170,7 +244,7 @@ function M._handle_message(client, message)
 
   if type(parsed) ~= "table" or parsed.jsonrpc ~= "2.0" then
     local request_id = type(parsed) == "table" and parsed.id or nil
-    M.send_response(client, request_id, nil, {
+    self:send_response(client, request_id, nil, {
       code = -32600,
       message = "Invalid Request",
       data = "Not a valid JSON-RPC 2.0 request",
@@ -179,23 +253,23 @@ function M._handle_message(client, message)
   end
 
   if parsed.id then
-    M._handle_request(client, parsed)
+    self:_handle_request(client, parsed)
   else
-    M._handle_notification(client, parsed)
+    self:_handle_notification(client, parsed)
   end
 end
 
 ---Handle JSON-RPC request (requires response)
 ---@param client table The client that sent the request
 ---@param request table The parsed JSON-RPC request
-function M._handle_request(client, request)
+function Server:_handle_request(client, request)
   local method = request.method
   local params = request.params or {}
   local id = request.id
 
-  local handler = M.state.handlers[method]
+  local handler = self.handlers[method]
   if not handler then
-    M.send_response(client, id, nil, {
+    self:send_response(client, id, nil, {
       code = -32601,
       message = "Method not found",
       data = "Unknown method: " .. tostring(method),
@@ -217,17 +291,17 @@ function M._handle_request(client, request)
         params = result.params,
       }
       -- Set up the completion callback
-      M._setup_deferred_response(deferred_info)
+      self:_setup_deferred_response(deferred_info)
       return -- Don't send response now
     end
 
     if error_data then
-      M.send_response(client, id, nil, error_data)
+      self:send_response(client, id, nil, error_data)
     else
-      M.send_response(client, id, result, nil)
+      self:send_response(client, id, result, nil)
     end
   else
-    M.send_response(client, id, nil, {
+    self:send_response(client, id, nil, {
       code = -32603,
       message = "Internal error",
       data = tostring(result), -- result contains error message when pcall fails
@@ -239,25 +313,28 @@ end
 local module_instance_id = math.random(10000, 99999)
 logger.debug("server", "Server module loaded with instance ID:", module_instance_id)
 
-function M._setup_deferred_response(deferred_info)
+---@param deferred_info table
+function Server:_setup_deferred_response(deferred_info)
   local co = deferred_info.coroutine
+  local key = tostring(co)
 
-  logger.debug("server", "Setting up deferred response for coroutine:", tostring(co))
+  logger.debug("server", "Setting up deferred response for coroutine:", key)
   logger.debug("server", "Storage happening in module instance:", module_instance_id)
 
-  -- Create a response sender function that captures the current server instance
+  -- The answer leaves through the instance that took the request, so it reaches the client that asked.
   local response_sender = function(result)
-    logger.debug("server", "Deferred response triggered for coroutine:", tostring(co))
+    logger.debug("server", "Deferred response triggered for coroutine:", key)
+    self.deferred[key] = nil
 
     if result and result.content then
       -- MCP-compliant response
-      M.send_response(deferred_info.client, deferred_info.id, result, nil)
+      self:send_response(deferred_info.client, deferred_info.id, result, nil)
     elseif result and result.error then
       -- Error response
-      M.send_response(deferred_info.client, deferred_info.id, nil, result.error)
+      self:send_response(deferred_info.client, deferred_info.id, nil, result.error)
     else
       -- Fallback error
-      M.send_response(deferred_info.client, deferred_info.id, nil, {
+      self:send_response(deferred_info.client, deferred_info.id, nil, {
         code = -32603,
         message = "Internal error",
         data = "Deferred response completed with unexpected format",
@@ -269,19 +346,20 @@ function M._setup_deferred_response(deferred_info)
   if not _G.claude_deferred_responses then
     _G.claude_deferred_responses = {}
   end
-  _G.claude_deferred_responses[tostring(co)] = response_sender
+  _G.claude_deferred_responses[key] = response_sender
+  self.deferred[key] = true
 
-  logger.debug("server", "Stored response sender in global table for coroutine:", tostring(co))
+  logger.debug("server", "Stored response sender in global table for coroutine:", key)
 end
 
 ---Handle JSON-RPC notification (no response)
 ---@param client table The client that sent the notification
 ---@param notification table The parsed JSON-RPC notification
-function M._handle_notification(client, notification)
+function Server:_handle_notification(client, notification)
   local method = notification.method
   local params = notification.params or {}
 
-  local handler = M.state.handlers[method]
+  local handler = self.handlers[method]
   if handler then
     pcall(handler, client, params)
   end
@@ -319,8 +397,8 @@ local function describe_fields(value)
 end
 
 ---Register message handlers for the server
-function M.register_handlers()
-  M.state.handlers = {
+function Server:register_handlers()
+  self.handlers = {
     ["initialize"] = function(client, params)
       return {
         protocolVersion = MCP_PROTOCOL_VERSION,
@@ -409,8 +487,8 @@ end
 ---@param method string The method name
 ---@param params table|nil The parameters to send
 ---@return boolean success Whether message was sent successfully
-function M.send(client, method, params)
-  if not M.state.server then
+function Server:send(client, method, params)
+  if not self.tcp then
     return false
   end
 
@@ -421,7 +499,7 @@ function M.send(client, method, params)
   }
 
   local json_message = vim.json.encode(message)
-  tcp_server.send_to_client(M.state.server, client.id, json_message)
+  tcp_server.send_to_client(self.tcp, client.id, json_message)
   return true
 end
 
@@ -431,8 +509,8 @@ end
 ---@param result any|nil The result data if successful
 ---@param error_data table|nil The error data if failed
 ---@return boolean success Whether response was sent successfully
-function M.send_response(client, id, result, error_data)
-  if not M.state.server then
+function Server:send_response(client, id, result, error_data)
+  if not self.tcp then
     return false
   end
 
@@ -449,7 +527,7 @@ function M.send_response(client, id, result, error_data)
   end
 
   local json_response = vim.json.encode(response)
-  tcp_server.send_to_client(M.state.server, client.id, json_response)
+  tcp_server.send_to_client(self.tcp, client.id, json_response)
   return true
 end
 
@@ -459,8 +537,8 @@ end
 ---@param on_written fun(written: integer)|nil When a connected client took the message: called once after the writes
 ---  finished, with how many succeeded (see tcp.lua broadcast)
 ---@return boolean success Whether a connected client took the message
-function M.broadcast(method, params, on_written)
-  if not M.state.server then
+function Server:broadcast(method, params, on_written)
+  if not self.tcp then
     return false
   end
 
@@ -471,13 +549,13 @@ function M.broadcast(method, params, on_written)
   }
 
   local json_message = vim.json.encode(message)
-  return tcp_server.broadcast(M.state.server, json_message, on_written) > 0
+  return tcp_server.broadcast(self.tcp, json_message, on_written) > 0
 end
 
 ---Get server status information
 ---@return table status Server status information
-function M.get_status()
-  if not M.state.server then
+function Server:get_status()
+  if not self.tcp then
     return {
       running = false,
       port = nil,
@@ -487,10 +565,129 @@ function M.get_status()
 
   return {
     running = true,
-    port = M.state.port,
-    client_count = tcp_server.get_client_count(M.state.server),
-    clients = tcp_server.get_clients_info(M.state.server),
+    port = self.port,
+    client_count = tcp_server.get_client_count(self.tcp),
+    clients = tcp_server.get_clients_info(self.tcp),
   }
+end
+
+-- The module-level functions below serve the single-session callers until Task 12. They act on a default instance made
+-- at first use. Its entry points go through the module functions, so a caller that replaces `server.broadcast`,
+-- `server.send_response` or `server._handle_message` still sees every call of the default instance.
+---@type ClaudinhoServer|nil
+local default_instance
+
+---@return ClaudinhoServer
+local function default()
+  if not default_instance then
+    local instance = M.new()
+    for _, name in ipairs({ "send", "send_response", "broadcast", "_handle_message", "_handle_request" }) do
+      instance[name] = function(_, ...)
+        return M[name](...)
+      end
+    end
+    default_instance = instance
+  end
+  return default_instance
+end
+
+-- The old module state, as a view of the default instance: `server` is its TCP object.
+local state_fields = { server = "tcp", port = "port", auth_token = "auth_token", handlers = "handlers" }
+
+---@class ServerState
+---@field server table|nil The TCP server object of the default instance
+---@field port number|nil
+---@field auth_token string|nil
+---@field handlers table Message handlers by method name
+M.state = setmetatable({}, {
+  __index = function(_, key)
+    local field = state_fields[key]
+    if field then
+      return default()[field]
+    end
+    return nil
+  end,
+  __newindex = function(state, key, value)
+    local field = state_fields[key]
+    if field then
+      default()[field] = value
+    else
+      rawset(state, key, value)
+    end
+  end,
+})
+
+---Start the default instance
+---@param config ClaudinhoConfig
+---@param auth_token string|nil
+---@return boolean success
+---@return number|string port_or_error
+function M.start(config, auth_token)
+  return Server.start(default(), config, auth_token)
+end
+
+---Stop the default instance
+---@return boolean success
+---@return string|nil error_message
+function M.stop()
+  return Server.stop(default())
+end
+
+function M.register_handlers()
+  Server.register_handlers(default())
+end
+
+---@param client table
+---@param message string
+function M._handle_message(client, message)
+  Server._handle_message(default(), client, message)
+end
+
+---@param client table
+---@param request table
+function M._handle_request(client, request)
+  Server._handle_request(default(), client, request)
+end
+
+---@param client table
+---@param notification table
+function M._handle_notification(client, notification)
+  Server._handle_notification(default(), client, notification)
+end
+
+---@param deferred_info table
+function M._setup_deferred_response(deferred_info)
+  Server._setup_deferred_response(default(), deferred_info)
+end
+
+---@param client table
+---@param method string
+---@param params table|nil
+---@return boolean
+function M.send(client, method, params)
+  return Server.send(default(), client, method, params)
+end
+
+---@param client WebSocketClient
+---@param id number|string|nil
+---@param result any|nil
+---@param error_data table|nil
+---@return boolean
+function M.send_response(client, id, result, error_data)
+  return Server.send_response(default(), client, id, result, error_data)
+end
+
+---@param method string
+---@param params table|nil
+---@param on_written fun(written: integer)|nil
+---@return boolean
+function M.broadcast(method, params, on_written)
+  return Server.broadcast(default(), method, params, on_written)
+end
+
+---@return table
+function M.get_status()
+  return Server.get_status(default())
 end
 
 return M

@@ -21,6 +21,7 @@ local CLOSE_REASONS = {
 
 ---@class WebSocketClient
 ---@field id string Unique client identifier
+---@field server_id integer|nil Id of the server instance that accepted the client (set by tcp.lua)
 ---@field tcp_handle table The vim.loop TCP handle
 ---@field state string Connection state: "connecting", "upgrading" (its 101 reply is being written), "connected", "closing", "closed"
 ---@field buffer string Incoming data buffer

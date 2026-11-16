@@ -7,6 +7,7 @@ local M = {}
 ---@field server table The vim.loop TCP server handle
 ---@field port number The port the server is listening on
 ---@field auth_token string|nil The authentication token for validating connections
+---@field id integer|nil Id of the server instance that owns this TCP server; each client gets it as `server_id`
 ---@field clients table<string, WebSocketClient> Table of connected clients
 ---@field on_message function Callback for WebSocket messages
 ---@field on_connect function Callback for new connections
@@ -138,9 +139,10 @@ end
 ---@param config ClaudinhoConfig Server configuration
 ---@param callbacks table Callback functions
 ---@param auth_token string|nil Authentication token for validating connections
+---@param server_id integer|nil Id of the server instance, marked on each client as `server_id`
 ---@return TCPServer|nil server The server object, or nil on error
 ---@return string|nil error Error message if failed
-function M.create_server(config, callbacks, auth_token)
+function M.create_server(config, callbacks, auth_token, server_id)
   local min_port = config.port_range.min
   local max_port = config.port_range.max
 
@@ -149,6 +151,7 @@ function M.create_server(config, callbacks, auth_token)
     server = nil,
     port = nil,
     auth_token = auth_token,
+    id = server_id,
     clients = {},
     on_message = callbacks.on_message or function() end,
     on_connect = callbacks.on_connect or function() end,
@@ -201,6 +204,7 @@ function M._handle_new_connection(server)
 
   -- Create WebSocket client wrapper
   local client = client_manager.create_client(client_tcp, server.keepalive_timeout)
+  client.server_id = server.id
   server.clients[client.id] = client
 
   -- Set up data handler
