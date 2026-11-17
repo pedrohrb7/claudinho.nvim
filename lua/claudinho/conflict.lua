@@ -1,7 +1,7 @@
 local M = {}
 
-M.MESSAGE = "[Claudinho] claudecode.nvim is also loaded, and the two plugins cannot run together. "
-  .. "Claudinho is disabled; remove claudecode.nvim to use it."
+M.MESSAGE = "[Claudinho] claudecode.nvim is also installed. "
+  .. "Both plugins run, but Claudinho replaces it: remove claudecode.nvim."
 
 ---Pure detection, no warning. True when claudecode.nvim is loaded (vim.g.loaded_claudecode is set) or is on the
 ---runtimepath (lua/claudecode/init.lua), which also covers setup() running from init.lua before its plugin/ file.
@@ -18,13 +18,17 @@ function M.detected()
   return false
 end
 
----True when claudecode.nvim is loaded or on the runtimepath (see `detected`); warns once per session.
----@return boolean
-function M.check()
+---Warns that claudecode.nvim is installed, once per session and only with `notify = true`. The caller passes the
+---flag because `setup` runs it before the config is applied. Both plugins keep running.
+---@param notify_enabled boolean|nil The user's own `notify = true`
+---@return boolean detected Whether claudecode.nvim is installed
+function M.warn(notify_enabled)
   if not M.detected() then
     return false
   end
-  vim.notify_once(M.MESSAGE, vim.log.levels.WARN)
+  if notify_enabled == true then
+    vim.notify_once(M.MESSAGE, vim.log.levels.WARN, { title = "Claudinho" })
+  end
   return true
 end
 

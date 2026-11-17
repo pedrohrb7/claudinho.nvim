@@ -359,3 +359,22 @@ Mode: `--step`, same gate policy as the 2026-11-15 run. The run state `.claude/r
   - Layouts `float` and `tab`: a diff opens as before (the float hides while a diff is open).
   - A tab started after `:cd` elsewhere uses the new `:pwd`.
 - **Out of scope:** `tests/minimal_init.lua:73` still passes the removed `auto_start = false` (harmless, warns only with `notify`) and `tests/selection_test.lua:2982` has a comment about `terminal.provider = "none"`; unit mocks in `send_command_spec`, `focus_after_send_spec`, `send_complete_event_spec`, `add_command_spec`, `tree_send_visual_spec`, `tree_buffer_classification_spec` and `conflict_spec` stub `without_removed_options` with one return value and `auto_start` (they pass but do not mirror the `(config, found)` signature). To the backlog.
+
+### Task 14 - claudecode.nvim vira aviso (done)
+
+- **Files:**
+  - `lua/claudinho/conflict.lua`: `MESSAGE` is the section 4 text; `check()` replaced by `warn(notify_enabled)`, which returns `detected()` and calls `vim.notify_once(MESSAGE, WARN, { title = "Claudinho" })` only when `notify_enabled == true`.
+  - `plugin/claudinho.lua`: no conflict check; the loader goes on to the auto-setup.
+  - `lua/claudinho/init.lua`: `setup` calls `conflict.warn(opts.notify == true)` and continues.
+  - `lua/claudinho/health.lua`: new `check_conflict()`, always run (with or without `setup()`): WARN `claudecode.nvim is loaded (g:loaded_claudecode is set)` or `claudecode.nvim is installed (lua/claudecode/init.lua is on the runtimepath)`, with the section 11 advice; the Phase 0 error branch removed from `check_setup`.
+  - `CHANGELOG.md`: one Unreleased Changed entry.
+  - Tests (before -> after): `tests/unit/conflict_spec.lua` 8 -> 10 (`warn` cases, silent without `notify`, setup continues); `tests/unit/plugin_loader_spec.lua` 7 -> 6 (the "warns once and stops" and "does not repeat" cases became one: the loader does not stop, shows no warning, goes on to the auto-setup); `tests/unit/health_spec.lua` 17 -> 18 (two WARN cases: `g:loaded_claudecode` without setup, runtimepath next to a healthy setup); `tests/unit/init_spec.lua` 30 -> 30 (conflict stub gains `warn`; "does nothing when claudecode.nvim is loaded" replaced by "sets up normally when claudecode.nvim is detected, passing the notify flag to the warning"); `tests/integration/loader_spec.lua` 3 -> 3 (`setup({ notify = true })`, "is also installed", `:Claudinho` = 2, `:ClaudeCodeStart` = 0, one warning, `init=true` in the runtimepath case).
+- **Decisions:**
+  - `conflict.warn` uses `vim.notify_once` with the flag from `setup` (not `notify.info`), because `config.notify` is not applied yet when `setup` runs (as the Task 13 removed-key warnings).
+  - `check_conflict()` reads `vim.g.loaded_claudecode` first, so "loaded" wins over "installed" when both hold; `detected()` is unchanged.
+  - Checks (test-runner): `check` 0 warnings / 0 errors in 208 files; `format-check` green; `unit` (`BUSTED_SEED=12345 CI=true`) 1884 / 0 / 0 / 34 (632 s; +2); `integration` (Neovim 0.12.3 through `mise exec`) 36 files, 572 passed, plus only the known `claude_stub_spec` failure.
+- **Assumptions:** none.
+- **Approved scope:** `tests/unit/init_spec.lua` (conflict stub and the refusal case), approved by the user on 2026-11-17.
+- **Migrations / env vars:** none.
+- **Docs pending:** `README.md` and `README.en.md` (Task 17): "Coming from claudecode.nvim" says both run and removing claudecode.nvim is recommended (rule 33). `CLAUDE.md` (Task 18): the Vision line "The plugin refuses to run when claudecode.nvim is loaded" is now wrong. `ARCHITECTURE.md` and `PROTOCOL.md` (Task 20): any mention of the Phase 0 refusal.
+- **Manual checks:** with claudecode.nvim installed next to Claudinho, `:Claudinho` works and `:checkhealth claudinho` shows the WARN with the advice, with and without `setup()`; with `notify = true` the warning shows once per start, with `notify = false` none.

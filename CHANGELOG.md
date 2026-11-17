@@ -21,6 +21,7 @@ Claudinho.nvim is a hard fork of [claudecode.nvim](https://github.com/coder/clau
 - A diff reads the Claude window's size from `window.right.width` and `window.right.diff_width` (they replace `terminal.split_width_percentage` and `terminal.diff_split_width_percentage`). Only the `right` layout is resized while a diff is open; the Claude window has a fixed width, so the other windows of the tab share the rest equally, and the diff keeps at least a third of the screen. A diff that opens in a new tab puts the Claude window to the right, or below with `window.layout = "bottom"`.
 - Removed config keys warn only with `notify = true` (read as given, before the config is merged), and `:checkhealth claudinho` lists each one the config still has. `terminal.provider` is a removed key with any value (`"snacks"` no longer becomes `"native"`).
 - New tabs always start in Neovim's current directory (`:pwd`).
+- claudecode.nvim installed next to Claudinho is now a warning, not a refusal: both plugins run, `setup()` configures everything and `:Claudinho` exists. With `notify = true`, `[Claudinho] claudecode.nvim is also installed. Both plugins run, but Claudinho replaces it: remove claudecode.nvim.` shows once per session. `:checkhealth claudinho` shows a WARN for it, with or without `setup()`. `plugin/claudinho.lua` no longer checks for it.
 
 ### Removed
 

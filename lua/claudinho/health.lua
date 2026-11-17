@@ -29,13 +29,23 @@ local function check_neovim()
   end
 end
 
+---WARN when claudecode.nvim is installed, with or without `setup()`. Both plugins run.
+local function check_conflict()
+  local reason
+  if vim.g and vim.g.loaded_claudecode then
+    reason = "claudecode.nvim is loaded (g:loaded_claudecode is set)"
+  elseif require("claudinho.conflict").detected() then
+    reason = "claudecode.nvim is installed (lua/claudecode/init.lua is on the runtimepath)"
+  else
+    return
+  end
+  warn(reason, {
+    "Both plugins run, but Claudinho replaces it. Remove claudecode.nvim from your plugin manager and restart Neovim.",
+  })
+end
+
 ---@param claudinho table The main plugin module
 local function check_setup(claudinho)
-  local conflict = require("claudinho.conflict")
-  if not claudinho.state.initialized and conflict.detected() then
-    error_(conflict.MESSAGE, { "Remove claudecode.nvim (uninstall it from your plugin manager), then restart Neovim" })
-    return false
-  end
   if claudinho.state.initialized then
     ok("claudinho.nvim " .. claudinho.version:string() .. " is set up")
     return true
@@ -156,6 +166,8 @@ function M.check()
     error_("Could not load claudinho module: " .. tostring(claudinho))
     return
   end
+
+  check_conflict()
 
   if not check_setup(claudinho) then
     return

@@ -73,7 +73,8 @@ describe("claudinho.init", function()
     state = { active = nil, new_error = nil, notices = {}, autocmds = {}, selects = {} }
 
     package.loaded["claudinho.conflict"] = {
-      check = function()
+      warn = function(notify_enabled)
+        state.warn_notify = notify_enabled
         return state.conflict == true
       end,
     }
@@ -221,14 +222,15 @@ describe("claudinho.init", function()
       assert.is_true(state.commands_config.keymaps.preset)
     end)
 
-    it("does nothing when claudecode.nvim is loaded", function()
+    it("sets up normally when claudecode.nvim is detected, passing the notify flag to the warning", function()
       state.conflict = true
 
-      local returned = claudinho.setup()
+      local returned = claudinho.setup({ notify = true })
 
       assert.are.equal(claudinho, returned)
-      assert.are.same({}, log)
-      assert.is_false(claudinho.state.initialized)
+      assert.is_true(state.warn_notify)
+      assert.is_true(claudinho.state.initialized)
+      assert.are.equal(1, count("commands.setup"))
     end)
 
     it("can run twice", function()

@@ -54,19 +54,28 @@ describe("claudinho.conflict", function()
   end)
 
   it("reports no conflict without loaded_claudecode", function()
-    expect(conflict.check()).to_be_false()
+    expect(conflict.warn(true)).to_be_false()
     expect(#notifications).to_be(0)
   end)
 
-  it("reports a conflict and warns once with loaded_claudecode", function()
+  it("reports a conflict and warns once with loaded_claudecode and notify on", function()
     vim.g.loaded_claudecode = 1
 
-    expect(conflict.check()).to_be_true()
-    expect(conflict.check()).to_be_true()
+    expect(conflict.warn(true)).to_be_true()
+    expect(conflict.warn(true)).to_be_true()
 
     expect(#notifications).to_be(1)
     expect(notifications[1].msg).to_be(conflict.MESSAGE)
     expect(notifications[1].level).to_be(vim.log.levels.WARN)
+  end)
+
+  it("reports a conflict without a warning when notify is off", function()
+    vim.g.loaded_claudecode = 1
+
+    expect(conflict.warn(false)).to_be_true()
+    expect(conflict.warn(nil)).to_be_true()
+
+    expect(#notifications).to_be(0)
   end)
 
   it("reports a conflict and warns once when claudecode.nvim is on the runtimepath", function()
@@ -78,8 +87,8 @@ describe("claudinho.conflict", function()
 
     expect(conflict.detected()).to_be_true()
     expect(#notifications).to_be(0)
-    expect(conflict.check()).to_be_true()
-    expect(conflict.check()).to_be_true()
+    expect(conflict.warn(true)).to_be_true()
+    expect(conflict.warn(true)).to_be_true()
 
     expect(#notifications).to_be(1)
     expect(notifications[1].msg).to_be(conflict.MESSAGE)
@@ -90,21 +99,21 @@ describe("claudinho.conflict", function()
       return {}
     end
 
-    expect(conflict.check()).to_be_false()
+    expect(conflict.warn(true)).to_be_false()
     expect(#notifications).to_be(0)
   end)
 
   it("counts a stub without nvim_get_runtime_file as no conflict", function()
     vim.api.nvim_get_runtime_file = nil
 
-    expect(conflict.check()).to_be_false()
+    expect(conflict.warn(true)).to_be_false()
     expect(#notifications).to_be(0)
   end)
 
   it("counts a missing vim.g as no conflict", function()
     vim.g = nil
 
-    expect(conflict.check()).to_be_false()
+    expect(conflict.warn(true)).to_be_false()
     expect(#notifications).to_be(0)
   end)
 
@@ -139,19 +148,38 @@ describe("claudinho.conflict", function()
       end
     end
 
-    it("does nothing when claudecode.nvim is loaded", function()
+    it("sets up normally and warns once when claudecode.nvim is loaded and notify is on", function()
       vim.g.loaded_claudecode = 1
       stub_dependencies()
       package.loaded["claudinho"] = nil
       local claudinho = require("claudinho")
 
-      local result = claudinho.setup({ auto_start = true })
+      claudinho.setup({ notify = true })
+      claudinho.setup({ notify = true })
 
-      expect(result).to_be(claudinho)
-      expect(#calls).to_be(0)
-      expect(claudinho.state.initialized).to_be_false()
-      expect(#notifications).to_be(1)
-      expect(notifications[1].msg).to_be(conflict.MESSAGE)
+      expect(calls[1]).to_be("config.apply")
+      expect(claudinho.state.initialized).to_be_true()
+      local count = 0
+      for _, n in ipairs(notifications) do
+        if n.msg == conflict.MESSAGE then
+          count = count + 1
+        end
+      end
+      expect(count).to_be(1)
+    end)
+
+    it("sets up normally and stays silent when claudecode.nvim is loaded and notify is off", function()
+      vim.g.loaded_claudecode = 1
+      stub_dependencies()
+      package.loaded["claudinho"] = nil
+      local claudinho = require("claudinho")
+
+      claudinho.setup({})
+
+      expect(claudinho.state.initialized).to_be_true()
+      for _, n in ipairs(notifications) do
+        expect(n.msg == conflict.MESSAGE).to_be_false()
+      end
     end)
 
     it("sets up normally without a conflict", function()

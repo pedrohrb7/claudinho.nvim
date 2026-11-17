@@ -166,12 +166,11 @@ end
 ---@param opts PartialClaudinhoConfig|nil Optional configuration table to override defaults.
 ---@return table module The plugin module
 function M.setup(opts)
-  if require("claudinho.conflict").check() then
-    return M
-  end
+  opts = opts or {}
+  -- claudecode.nvim installed: both plugins run, and the warning follows the user's own `notify = true`.
+  require("claudinho.conflict").warn(opts.notify == true)
 
   local config = require("claudinho.config")
-  opts = opts or {}
   -- `notify` is read raw, before `apply`: the warnings of the removed keys follow the user's own `notify = true`.
   local found
   opts, found = config.without_removed_options(opts, { notify = opts.notify == true })

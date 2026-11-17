@@ -7,9 +7,6 @@ if vim.g.loaded_claudinho then
   return
 end
 vim.g.loaded_claudinho = 1
-if require("claudinho.conflict").check() then
-  return
-end
 
 --- Example: In your `init.lua`, you can set `vim.g.claudinho_auto_setup = { notify = true }`
 --- to set Claudinho up when Neovim loads, without calling `setup()` yourself.

@@ -843,7 +843,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `lua/claudinho/conflict.lua`, `plugin/claudinho.lua`, `lua/claudinho/init.lua`, `lua/claudinho/health.lua`, `tests/unit/conflict_spec.lua`, `tests/unit/plugin_loader_spec.lua`, `tests/unit/health_spec.lua`, `tests/integration/loader_spec.lua`, `CHANGELOG.md`
 - **Depends on:** Task 12
 - **Done when:** a seção 11 está aplicada; com o claudecode.nvim falso do `loader_spec` no runtimepath, `:Claudinho` existe e o aviso aparece uma vez só com `notify = true`; o health mostra WARN; os quatro specs passam; entrada no `## [Unreleased]`; gate verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 15 - Critérios de sucesso como testes de integração
 

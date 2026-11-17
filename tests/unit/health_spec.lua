@@ -125,7 +125,7 @@ describe("health", function()
     expect(has_report("ok", "Claude CLI found")).to_be_false()
   end)
 
-  it("reports the claudecode.nvim conflict instead of a missing setup()", function()
+  it("warns about claudecode.nvim loaded, without setup(), and still reports the missing setup", function()
     fake_state.initialized = false
     local saved_g = vim.g
     vim.g = { loaded_claudecode = 1 }
@@ -135,9 +135,24 @@ describe("health", function()
     vim.g = saved_g
     package.loaded["claudinho.conflict"] = nil
 
-    expect(has_report("error", "claudecode.nvim is also loaded")).to_be_true()
-    expect(has_report("error", "has not been called")).to_be_false()
-    expect(has_report("ok", "Claude CLI found")).to_be_false()
+    expect(has_report("warn", "claudecode.nvim is loaded %(g:loaded_claudecode is set%)")).to_be_true()
+    expect(has_report("error", "setup%(%) has not been called")).to_be_true()
+  end)
+
+  it("warns about claudecode.nvim on the runtimepath next to a healthy setup", function()
+    local saved_find = vim.api.nvim_get_runtime_file
+    vim.api.nvim_get_runtime_file = function()
+      return { "/pack/claudecode.nvim/lua/claudecode/init.lua" }
+    end
+    package.loaded["claudinho.conflict"] = nil
+
+    health.check()
+    vim.api.nvim_get_runtime_file = saved_find
+    package.loaded["claudinho.conflict"] = nil
+
+    expect(has_report("warn", "claudecode.nvim is installed %(lua/claudecode/init.lua is on the runtimepath%)")).to_be_true()
+    expect(has_report("ok", "is set up")).to_be_true()
+    expect(has_report("error", ".")).to_be_false()
   end)
 
   it("errors when the Claude CLI is missing", function()

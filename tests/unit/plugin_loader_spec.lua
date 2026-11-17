@@ -123,29 +123,19 @@ describe("plugin/claudinho.lua", function()
     expect(#setup_calls).to_be(0)
   end)
 
-  it("warns once and stops when claudecode.nvim is loaded", function()
+  it("does not warn or stop when claudecode.nvim is loaded, and goes on to the auto-setup", function()
+    local opts = { notify = true }
     vim.g.loaded_claudecode = 1
-    vim.g.claudinho_auto_setup = { auto_start = true }
+    vim.g.claudinho_auto_setup = opts
 
-    load_plugin()
-    vim.g.loaded_claudinho = nil
     load_plugin()
 
     expect(vim.g.loaded_claudecode).to_be(1)
-    expect(#notifications).to_be(1)
-    expect(notifications[1].msg).to_be(require("claudinho.conflict").MESSAGE)
-    expect(notifications[1].level).to_be(vim.log.levels.WARN)
-    expect(#deferred).to_be(0)
-    expect(main_loaded).to_be(0)
-  end)
-
-  it("does not repeat the warning on a new source", function()
-    vim.g.loaded_claudecode = 1
-
-    load_plugin()
-    load_plugin()
-
     expect(vim.g.loaded_claudinho).to_be(1)
-    expect(#notifications).to_be(1)
+    expect(#notifications).to_be(0)
+    expect(#deferred).to_be(1)
+    expect(main_loaded).to_be(1)
+    deferred[1]()
+    expect(setup_calls[1]).to_be(opts)
   end)
 end)
