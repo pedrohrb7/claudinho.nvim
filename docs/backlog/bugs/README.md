@@ -11,6 +11,9 @@ Confirmed bugs that need fixing, one file per bug.
 
 ## Index
 
-| Entry                                                                                                                          | Severity | Status |
-| ------------------------------------------------------------------------------------------------------------------------------ | -------- | ------ |
-| [Teste claude_stub "is the first PATH entry" falha no runner completo](2026-11-16-claude-stub-path-first-entry-integration.md) | medium   | Open   |
+| Entry                                                                                                                                 | Severity | Status      |
+| ------------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------- |
+| [Teste claude_stub "is the first PATH entry" falha no runner completo](2026-11-16-claude-stub-path-first-entry-integration.md)        | medium   | Open        |
+| [Diff unified nao redimensiona a janela do Claude para diff_width](2026-11-17-unified-diff-does-not-resize-claude-window.md)          | low      | Open        |
+| [Teste session_spec depende do ambiente de quem o executa (CLAUDINHO_PORT herdado)](2026-11-17-session-spec-depends-on-caller-env.md) | medium   | Open        |
+| [E937 em BufWipeout ao sair do Claude com Ctrl+C duas vezes](2026-11-17-bufwipeout-e937-on-claude-exit.md)                            | high     | In progress |
