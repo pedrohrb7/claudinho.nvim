@@ -15,6 +15,7 @@ describe("The @ mention queue", function()
   local loaded = {
     "claudinho",
     "claudinho.config",
+    "claudinho.sessions",
     "claudinho.mention_queue",
     "claudinho.logger",
     "claudinho.terminal",
@@ -27,6 +28,29 @@ describe("The @ mention queue", function()
   }
   local saved = {}
   local loop, errors, error_times, claudinho, frame, terminal_opens
+  local active_tab = require("tests.helpers.active_tab")
+  local server_module, instance, tab
+
+  ---Start the server of the tab (a new instance, as a new tab has) and wait for Claude to connect to it.
+  local function start_plugin()
+    instance = server_module.new({
+      on_open = function()
+        vim.schedule(function()
+          tab.queue:on_open()
+        end)
+      end,
+    })
+    assert(instance:start(claudinho.state.config, token))
+  end
+
+  ---Stop the server of the tab and clear its queue, as closing the tab does.
+  local function stop_plugin()
+    if instance then
+      instance:stop()
+      instance = nil
+    end
+    tab.queue:clear()
+  end
 
   -- A fake libuv loop. Like libuv, it fires every timer that is due in one phase, in the order they were started,
   -- and then the main loop runs every scheduled callback before time moves on. A callback that raises is recorded,
@@ -204,15 +228,28 @@ describe("The @ mention queue", function()
     }
     frame = require("claudinho.server.frame")
     claudinho = require("claudinho")
-    claudinho.setup({ auto_start = false, track_selection = false, enable_broadcast_debouncing_in_tests = true })
-    assert(claudinho.start(false))
+    claudinho.state.config = require("claudinho.config").apply({
+      track_selection = false,
+      enable_broadcast_debouncing_in_tests = true,
+    })
+    server_module = require("claudinho.server.init")
+    tab = active_tab.install({
+      server = {
+        broadcast = function(method, params, on_written)
+          return instance ~= nil and instance:broadcast(method, params, on_written)
+        end,
+      },
+      status = function()
+        return instance:get_status()
+      end,
+    })
+    start_plugin()
     run(0)
   end)
 
   after_each(function()
-    if claudinho.state.server then
-      claudinho.stop()
-    end
+    stop_plugin()
+    active_tab.uninstall(tab)
     vim.loop.new_timer = saved.new_timer
     vim.loop.now = saved.now
     vim.schedule = saved.schedule
@@ -229,7 +266,7 @@ describe("The @ mention queue", function()
   ---completes only when the test calls `handshake_written`, as a libuv write completes in a later loop turn.
   local function claude_connects()
     local tcp = require("claudinho.server.tcp")
-    local server = claudinho.state.server.state.server
+    local server = instance.tcp
     tcp._handle_new_connection(server)
     local client = assert(server.clients["client_" .. _G.claudinho_clients_created])
     local claude = { client = client, written = {}, closed = false }
@@ -354,9 +391,9 @@ describe("The @ mention queue", function()
     assert.same({ "a.lua", "b.lua", "c.lua" }, names(claude.received()))
     assert.same({}, errors)
     assert_no_lua_error()
-    assert.same({}, claudinho.default_queue().mentions)
-    assert.is_nil(claudinho.default_queue().mention_timer)
-    assert.is_nil(claudinho.default_queue().connection_timer)
+    assert.same({}, tab.queue.mentions)
+    assert.is_nil(tab.queue.mention_timer)
+    assert.is_nil(tab.queue.connection_timer)
   end)
 
   it("A: a mention queued while Claude starts slowly is delivered, not expired", function()
@@ -379,8 +416,8 @@ describe("The @ mention queue", function()
 
     assert.same({ "a.lua" }, names(claude.received()))
     assert.same({}, errors)
-    assert.same({}, claudinho.default_queue().mentions)
-    assert.is_nil(claudinho.default_queue().connection_timer)
+    assert.same({}, tab.queue.mentions)
+    assert.is_nil(tab.queue.connection_timer)
   end)
 
   it(
@@ -398,7 +435,7 @@ describe("The @ mention queue", function()
         "Send timeout %- clearing 1 queued @ mentions that the connected Claude did not take in time",
         errors[1]
       )
-      assert.same({}, claudinho.default_queue().mentions)
+      assert.same({}, tab.queue.mentions)
     end
   )
 
@@ -431,7 +468,7 @@ describe("The @ mention queue", function()
     assert.same({}, claude.received())
     assert.equals(1, #errors)
     assert.matches("Connection timeout", errors[1])
-    assert.same({}, claudinho.default_queue().mentions)
+    assert.same({}, tab.queue.mentions)
   end)
 
   it("H: a handshake and a drop just before the deadline do not move it", function()
@@ -446,7 +483,7 @@ describe("The @ mention queue", function()
     assert.same({}, claude.received())
     assert.same({ 10600 }, error_times)
     assert.matches("Connection timeout %- clearing 1 queued @ mentions", errors[1])
-    assert.same({}, claudinho.default_queue().mentions)
+    assert.same({}, tab.queue.mentions)
   end)
 
   it("control: a send in the tick after the handshake waits connection_wait_delay with the queued mentions", function()
@@ -485,7 +522,7 @@ describe("The @ mention queue", function()
     run(1000)
 
     assert.same({}, claude.received())
-    assert.same({}, claudinho.default_queue().mentions)
+    assert.same({}, tab.queue.mentions)
     assert.equals(1, #errors)
     assert.matches("connection failed while the @ mention /project/a%.lua was sent", errors[1])
   end)
@@ -498,8 +535,8 @@ describe("The @ mention queue", function()
     claude.write_error = "ECONNRESET"
     send("src/a.lua")
     -- The send went out at once: nothing waits in the queue, and no flush is due.
-    assert.same({}, claudinho.default_queue().mentions)
-    assert.is_nil(claudinho.default_queue().mention_timer)
+    assert.same({}, tab.queue.mentions)
+    assert.is_nil(tab.queue.mention_timer)
     run(100)
 
     assert.same({}, claude.received())
@@ -646,7 +683,7 @@ describe("The @ mention queue", function()
 
     assert.same({ 10601 }, error_times)
     assert.matches("Send timeout %- clearing 1 queued", errors[1])
-    assert.same({}, claudinho.default_queue().mentions)
+    assert.same({}, tab.queue.mentions)
     assert_nothing_received(clients)
     assert_no_lua_error()
   end)
@@ -668,7 +705,7 @@ describe("The @ mention queue", function()
 
         assert.same({ 10601 }, error_times)
         assert.matches("clearing 1 queued", errors[1])
-        assert.same({}, claudinho.default_queue().mentions)
+        assert.same({}, tab.queue.mentions)
         assert_nothing_received(clients)
         assert_no_lua_error()
       end
@@ -696,8 +733,8 @@ describe("The @ mention queue", function()
     first.handshake()
     send("/project/a.lua")
     run(100)
-    claudinho.stop()
-    assert(claudinho.start(false))
+    stop_plugin()
+    start_plugin()
     run(12000)
     local second = claude_connects()
     second.handshake()
@@ -735,14 +772,14 @@ describe("The @ mention queue", function()
     assert.same({}, errors)
   end)
 
-  it("C: :ClaudeCodeStop during the wait after a connect raises no Lua error and sends nothing", function()
+  it("C: : stopping the server during the wait after a connect raises no Lua error and sends nothing", function()
     send("/project/a.lua")
     local claude = claude_connects()
     claude.handshake()
     run(100)
-    claudinho.stop()
-    assert.is_nil(claudinho.default_queue().mention_timer)
-    assert.is_nil(claudinho.default_queue().connection_timer)
+    stop_plugin()
+    assert.is_nil(tab.queue.mention_timer)
+    assert.is_nil(tab.queue.connection_timer)
     run(11000)
 
     assert_no_lua_error()
@@ -755,8 +792,8 @@ describe("The @ mention queue", function()
     local first = claude_connects()
     first.handshake()
     run(100)
-    claudinho.stop()
-    assert(claudinho.start(false))
+    stop_plugin()
+    start_plugin()
     local second = claude_connects()
     second.handshake()
     run(1500)
@@ -769,8 +806,8 @@ describe("The @ mention queue", function()
     send("/project/old.lua")
     -- In the timer phase in which the deadline passes, before its callback runs: stop, start, and send again.
     at(10600, function()
-      claudinho.stop()
-      assert(claudinho.start(false))
+      stop_plugin()
+      start_plugin()
       send("/project/new.lua")
     end)
     run(10600)
@@ -783,12 +820,12 @@ describe("The @ mention queue", function()
   end)
 
   it(
-    "B, C: :ClaudeCodeStop drops the deadline of the old mention: a mention sent after a restart gets its own",
+    "B, C: : stopping the server drops the deadline of the old mention: a mention sent after a restart gets its own",
     function()
       send("/project/old.lua")
       run(5000)
-      claudinho.stop()
-      assert(claudinho.start(false))
+      stop_plugin()
+      start_plugin()
       send("/project/new.lua")
       run(10599)
       assert.same({}, errors, "the old deadline at 10.6 s must not clear the mention sent after the restart")
@@ -811,14 +848,14 @@ describe("The @ mention queue", function()
 
     run(1)
     assert.matches("Connection timeout %- clearing 1 queued", errors[1])
-    assert.equals(2, #claudinho.default_queue().mentions)
+    assert.equals(2, #tab.queue.mentions)
     run(10000)
 
     assert.same({ 10600, 15600, 20600 }, error_times)
     assert.matches("Connection timeout %- clearing 1 queued", errors[2])
     assert.matches("Connection timeout %- clearing 1 queued", errors[3])
-    assert.same({}, claudinho.default_queue().mentions)
-    assert.is_nil(claudinho.default_queue().connection_timer)
+    assert.same({}, tab.queue.mentions)
+    assert.is_nil(tab.queue.connection_timer)
   end)
 
   it("B: of two mentions sent 5 s apart, a Claude ready between their deadlines gets the second", function()
@@ -832,7 +869,7 @@ describe("The @ mention queue", function()
 
     assert.same({ "second.lua" }, names(claude.received()))
     assert.same({ 10600 }, error_times)
-    assert.same({}, claudinho.default_queue().mentions)
+    assert.same({}, tab.queue.mentions)
   end)
 
   it("B, control: the deadline of a mention that went out clears no later mention", function()
@@ -865,7 +902,7 @@ describe("The @ mention queue", function()
 
     assert.equals(2, #errors)
     assert.matches("Connection timeout", errors[2])
-    assert.same({}, claudinho.default_queue().mentions)
+    assert.same({}, tab.queue.mentions)
   end)
 
   it("S: Claude drops within the debounce after a connected send: the mention times out with an error", function()
@@ -880,7 +917,7 @@ describe("The @ mention queue", function()
     assert.same({}, claude.received())
     assert.equals(1, #errors)
     assert.matches("Connection timeout", errors[1])
-    assert.same({}, claudinho.default_queue().mentions)
+    assert.same({}, tab.queue.mentions)
   end)
 
   it("S, control: Claude drops within the debounce after a connected send: the next Claude gets the mention", function()
@@ -970,9 +1007,9 @@ describe("The @ mention queue", function()
 
         assert.same(sent, names(claude.received()))
         assert.same({}, errors)
-        assert.same({}, claudinho.default_queue().mentions)
-        assert.is_nil(claudinho.default_queue().mention_timer)
-        assert.is_nil(claudinho.default_queue().connection_timer)
+        assert.same({}, tab.queue.mentions)
+        assert.is_nil(tab.queue.mention_timer)
+        assert.is_nil(tab.queue.connection_timer)
         assert_no_lua_error()
       end
     )
@@ -997,8 +1034,8 @@ describe("The @ mention queue", function()
     assert.same({ 10600 }, error_times)
     assert.matches("Connection timeout", errors[1])
     assert.equals(100 - got, cleared_count(errors[1]))
-    assert.same({}, claudinho.default_queue().mentions)
-    assert.is_nil(claudinho.default_queue().connection_timer)
+    assert.same({}, tab.queue.mentions)
+    assert.is_nil(tab.queue.connection_timer)
   end)
 
   it("F1: when a ready Claude leaves after the deadline, the rest leave at the next flush", function()
@@ -1016,8 +1053,8 @@ describe("The @ mention queue", function()
     assert.is_true(error_times[1] > 11000 and error_times[1] <= 11025, "the error came at " .. error_times[1])
     assert.matches("Connection timeout", errors[1])
     assert.equals(100 - got, cleared_count(errors[1]))
-    assert.same({}, claudinho.default_queue().mentions)
-    assert.is_nil(claudinho.default_queue().connection_timer)
+    assert.same({}, tab.queue.mentions)
+    assert.is_nil(tab.queue.connection_timer)
   end)
 
   it("F1: when a ready Claude leaves after the deadline while another waits, the rest leave at once", function()
@@ -1039,7 +1076,7 @@ describe("The @ mention queue", function()
     assert.is_true(error_times[1] > 11000 and error_times[1] <= 11025, "the error came at " .. error_times[1])
     assert.matches("Send timeout", errors[1])
     assert.equals(100 - got, cleared_count(errors[1]))
-    assert.same({}, claudinho.default_queue().mentions)
+    assert.same({}, tab.queue.mentions)
     assert_no_lua_error()
   end)
 
@@ -1066,8 +1103,8 @@ describe("The @ mention queue", function()
     assert.same({}, claude.received())
     assert.equals(1, #errors)
     assert.matches("Connection timeout %- clearing 1 queued", errors[1])
-    assert.same({}, claudinho.default_queue().mentions)
-    assert.is_nil(claudinho.default_queue().connection_timer)
+    assert.same({}, tab.queue.mentions)
+    assert.is_nil(tab.queue.connection_timer)
     assert_no_lua_error()
   end)
 
@@ -1091,14 +1128,14 @@ describe("The @ mention queue", function()
 
     assert.is_false(ok)
     assert.matches("non%-empty string", err)
-    assert.same({}, claudinho.default_queue().mentions)
-    assert.is_nil(claudinho.default_queue().mention_timer)
-    assert.is_nil(claudinho.default_queue().connection_timer)
+    assert.same({}, tab.queue.mentions)
+    assert.is_nil(tab.queue.mention_timer)
+    assert.is_nil(tab.queue.connection_timer)
     assert.equals(0, terminal_opens)
   end)
 
   it("G: a queued mention reaches Claude with the same absolute path as a connected send", function()
-    -- Relative input, as :ClaudeCodeAdd src/queued.lua passes it: both paths must make it absolute at the send.
+    -- Relative input, as :Claudinho add src/queued.lua passes it: both paths must make it absolute at the send.
     send("src/queued.lua")
     local claude = claude_connects()
     claude.handshake()

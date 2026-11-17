@@ -118,7 +118,7 @@ describe("a diff the user accepted for one Claude client", function()
       vim.notify = function(msg, level)
         notes[#notes + 1] = { msg = msg, level = level }
       end
-      require("claudinho")._create_commands()
+      require("claudinho.commands").setup({})
     end)
 
     after_each(function()
@@ -136,7 +136,7 @@ describe("a diff the user accepted for one Claude client", function()
     end
 
     local function user_closes_all_diffs()
-      vim._commands.ClaudeCodeCloseAllDiffs.callback({})
+      vim._commands.Claudinho.callback({ args = "close-all-diffs", fargs = { "close-all-diffs" }, bang = false })
     end
 
     local function read_file()
@@ -158,7 +158,7 @@ describe("a diff the user accepted for one Claude client", function()
       return vim.api.nvim_buf_get_lines(buf, 0, -1, false)
     end
 
-    it("is closed by :ClaudeCodeCloseAllDiffs, which puts the accepted text in the file's buffer", function()
+    it("is closed by :Claudinho close-all-diffs, which puts the accepted text in the file's buffer", function()
       open_and_accept()
       owner_exits()
 
@@ -172,7 +172,7 @@ describe("a diff the user accepted for one Claude client", function()
       assert.is_true(response._deferred, "the tab_name must be free for a new diff")
     end)
 
-    it("is closed by :ClaudeCodeCloseAllDiffs when the file already holds the accepted text", function()
+    it("is closed by :Claudinho close-all-diffs when the file already holds the accepted text", function()
       local accepted = open_and_accept()
       write_file(accepted)
       owner_exits()

@@ -1,5 +1,5 @@
 -- Regression tests for issue #289:
---   ClaudeCodeSend must classify tree/explorer buffers by FILETYPE only, not by
+--   :Claudinho send must classify tree/explorer buffers by FILETYPE only, not by
 --   a substring match on the buffer name (an absolute path). A normal
 --   filetype=lua file whose path contains "neo-tree"/"NvimTree" must NOT be
 --   treated as a tree buffer.
@@ -11,7 +11,7 @@
 require("tests.busted_setup")
 require("tests.mocks.vim")
 
-describe("ClaudeCodeSend tree-buffer classification (#289)", function()
+describe("Claudinho send tree-buffer classification (#289)", function()
   local claudinho
   local command_callback
   local original_require
@@ -24,6 +24,7 @@ describe("ClaudeCodeSend tree-buffer classification (#289)", function()
 
   before_each(function()
     package.loaded["claudinho"] = nil
+    package.loaded["claudinho.commands"] = nil
     package.loaded["claudinho.selection"] = nil
     package.loaded["claudinho.integrations"] = nil
     package.loaded["claudinho.terminal"] = nil
@@ -40,8 +41,11 @@ describe("ClaudeCodeSend tree-buffer classification (#289)", function()
     _G.vim = {
       api = {
         nvim_create_user_command = function(name, callback)
-          if name == "ClaudeCodeSend" then
-            command_callback = callback
+          if name == "Claudinho" then
+            command_callback = function(command_opts)
+              command_opts.fargs = { "send" }
+              return callback(command_opts)
+            end
           end
         end,
         nvim_create_augroup = function()
@@ -174,11 +178,7 @@ describe("ClaudeCodeSend tree-buffer classification (#289)", function()
     end
 
     claudinho = require("claudinho")
-    claudinho.setup({ auto_start = false })
-    claudinho.state.server = { broadcast = spy.new(function()
-      return true
-    end) }
-    claudinho.state.port = 12345
+    require("claudinho.commands").setup({})
     -- Tree path fans out via M.send_at_mention; stub it so we can detect routing.
     claudinho.send_at_mention = spy.new(function()
       return true
@@ -189,7 +189,7 @@ describe("ClaudeCodeSend tree-buffer classification (#289)", function()
     _G.require = original_require
   end)
 
-  it("registers the ClaudeCodeSend command", function()
+  it("registers the Claudinho command", function()
     assert.is_function(command_callback)
   end)
 
@@ -227,7 +227,7 @@ describe("ClaudeCodeSend tree-buffer classification (#289)", function()
 
     -- After <Esc> drops us to normal mode, the fixed predicate is filetype-only,
     -- so the buffer is treated as plain text and the selection is sent -- no
-    -- "ClaudeCodeSend_visual->TreeAdd" error, no tree extraction.
+    -- "Claudinho send_visual->TreeAdd" error, no tree extraction.
     assert.spy(mock_selection.send_at_mention_for_visual_selection).was_called()
     assert.spy(mock_integrations.get_selected_files_from_tree).was_not_called()
   end)

@@ -16,7 +16,7 @@ describe("a visual selection released after the buffer changed, with the real pl
   local claudinho = require("claudinho")
   local selection = require("claudinho.selection")
   local server = require("claudinho.server.init")
-  local real_broadcast, real_config_dir, config_dir, sent
+  local real_broadcast, sent
 
   local function press(keys)
     vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(keys, true, false, true), "xt", false)
@@ -43,13 +43,18 @@ describe("a visual selection released after the buffer changed, with the real pl
 
   local function start()
     claudinho.setup({
-      auto_start = false,
       log_level = "error",
       visual_demotion_delay_ms = 50,
       terminal_cmd = "sh -c 'sleep 60'",
-      terminal = { provider = "none" },
     })
-    assert.is_true(claudinho.start(false))
+    -- The selection goes to the active tab through the router, and this spec has no tab to hear it. It points it at
+    -- server.broadcast, which it replaces with a recorder.
+    selection.disable()
+    selection.enable({
+      broadcast = function(method, params, on_written)
+        return server.broadcast(method, params, on_written)
+      end,
+    }, 50)
     sent = {}
     server.broadcast = function(method, params)
       table.insert(sent, { method = method, params = params })
@@ -119,16 +124,11 @@ describe("a visual selection released after the buffer changed, with the real pl
   before_each(function()
     vim.o.hidden = true
     real_broadcast = server.broadcast
-    real_config_dir = vim.env.CLAUDE_CONFIG_DIR
-    config_dir = vim.fn.tempname()
-    vim.fn.mkdir(config_dir, "p")
-    vim.env.CLAUDE_CONFIG_DIR = config_dir
   end)
 
   after_each(function()
-    pcall(claudinho.stop)
+    selection.disable()
     server.broadcast = real_broadcast
-    vim.env.CLAUDE_CONFIG_DIR = real_config_dir
     pcall(vim.api.nvim_del_augroup_by_name, "ClaudinhoSelectionVisualEditSpec")
     vim.cmd("silent! only")
     vim.cmd("silent! %bwipeout!")

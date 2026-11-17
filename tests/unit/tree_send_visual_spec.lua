@@ -1,12 +1,11 @@
 require("tests.busted_setup")
 require("tests.mocks.vim")
 
-describe("ClaudeCodeSend visual selection in tree buffers", function()
+describe("Claudinho send visual selection in tree buffers", function()
   local original_require
   local claudinho
   local command_callback
 
-  local mock_server
   local mock_logger
   local mock_visual_commands
   local mock_integrations
@@ -14,6 +13,7 @@ describe("ClaudeCodeSend visual selection in tree buffers", function()
   before_each(function()
     -- Reset package cache
     package.loaded["claudinho"] = nil
+    package.loaded["claudinho.commands"] = nil
     package.loaded["claudinho.visual_commands"] = nil
     package.loaded["claudinho.integrations"] = nil
     package.loaded["claudinho.server.init"] = nil
@@ -23,18 +23,6 @@ describe("ClaudeCodeSend visual selection in tree buffers", function()
     package.loaded["claudinho.diff"] = nil
 
     -- Mocks
-    mock_server = {
-      broadcast = spy.new(function()
-        return true
-      end),
-      start = function()
-        return true, 12345
-      end,
-      stop = function()
-        return true
-      end,
-    }
-
     mock_logger = {
       setup = function() end,
       debug = function() end,
@@ -78,8 +66,11 @@ describe("ClaudeCodeSend visual selection in tree buffers", function()
 
     -- Mock vim API and environment
     _G.vim.api.nvim_create_user_command = spy.new(function(name, callback, opts)
-      if name == "ClaudeCodeSend" then
-        command_callback = callback
+      if name == "Claudinho" then
+        command_callback = function(command_opts)
+          command_opts.fargs = { "send" }
+          return callback(command_opts)
+        end
       end
     end)
     _G.vim.api.nvim_create_augroup = spy.new(function()
@@ -150,13 +141,9 @@ describe("ClaudeCodeSend visual selection in tree buffers", function()
       end
     end
 
-    -- Load plugin and setup
+    -- Load the plugin and create the command, as setup does
     claudinho = require("claudinho")
-    claudinho.setup({ auto_start = false })
-    claudinho.state.server = mock_server
-    claudinho.state.port = 12345
-    -- Ensure immediate broadcast path in tests
-    claudinho.state.config.disable_broadcast_debouncing = true
+    require("claudinho.commands").setup({})
 
     -- Spy on send_at_mention to count file sends without relying on broadcast internals
     claudinho.send_at_mention = spy.new(function()

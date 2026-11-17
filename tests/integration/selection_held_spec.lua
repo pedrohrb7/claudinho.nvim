@@ -1,4 +1,4 @@
--- Real-Neovim check of the held selection (issue #246) through the real start path, with real autocmds and timers:
+-- Real-Neovim check of the held selection (issue #246) through the real setup path, with real autocmds and timers:
 -- select text, press Esc, go to the Claude terminal, come back. Claude must still hold the selection. The unit tests
 -- in tests/selection_test.lua mock the events, so they cannot see what Neovim fires for a terminal that is being
 -- created: its BufEnter comes before the buffer has a name and before the provider registers it. Busted's mock vim
@@ -16,7 +16,8 @@ describe("a held selection with the real plugin", function()
   local claudinho = require("claudinho")
   local selection = require("claudinho.selection")
   local server = require("claudinho.server.init")
-  local real_broadcast, real_config_dir, config_dir
+  local lockfile = require("claudinho.lockfile")
+  local real_broadcast, real_lock_dir, lock_dir
 
   local function press(keys)
     vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(keys, true, false, true), "xt", false)
@@ -29,15 +30,20 @@ describe("a held selection with the real plugin", function()
     end, 10)
   end
 
-  local function start(terminal_config, delay_ms)
+  local function start(delay_ms)
     claudinho.setup({
-      auto_start = false,
       log_level = "error",
       visual_demotion_delay_ms = delay_ms,
       terminal_cmd = "sh -c 'sleep 60'",
-      terminal = terminal_config,
     })
-    assert.is_true(claudinho.start(false))
+    -- The selection goes to the active tab through the router, and these specs have no tab to hear it. They point it
+    -- at server.broadcast, which they replace with a recorder.
+    selection.disable()
+    selection.enable({
+      broadcast = function(method, params, on_written)
+        return server.broadcast(method, params, on_written)
+      end,
+    }, delay_ms)
     server.broadcast = function()
       return true
     end
@@ -79,16 +85,20 @@ describe("a held selection with the real plugin", function()
   before_each(function()
     vim.o.hidden = true
     real_broadcast = server.broadcast
-    real_config_dir = vim.env.CLAUDE_CONFIG_DIR
-    config_dir = vim.fn.tempname()
-    vim.fn.mkdir(config_dir, "p")
-    vim.env.CLAUDE_CONFIG_DIR = config_dir
+    -- A tab that a spec starts writes its lock file here, not in the real ~/.claude/ide.
+    real_lock_dir = lockfile.lock_dir
+    lock_dir = vim.fn.tempname()
+    vim.fn.mkdir(lock_dir, "p")
+    lockfile.lock_dir = lock_dir
   end)
 
   after_each(function()
-    pcall(claudinho.stop)
+    require("claudinho.sessions").kill_all()
+    require("claudinho.ui.window").teardown()
+    selection.disable()
     server.broadcast = real_broadcast
-    vim.env.CLAUDE_CONFIG_DIR = real_config_dir
+    lockfile.lock_dir = real_lock_dir
+    vim.fn.delete(lock_dir, "rf")
     for _, buf in ipairs(vim.api.nvim_list_bufs()) do
       if vim.bo[buf].buftype == "terminal" then
         pcall(vim.fn.jobstop, vim.bo[buf].channel)
@@ -100,7 +110,7 @@ describe("a held selection with the real plugin", function()
 
   for _, delay_ms in ipairs({ 50, 1000 }) do
     it("keeps the selection when the Claude terminal first opens (delay " .. delay_ms .. ")", function()
-      start({ provider = "native", show_native_term_exit_tip = false }, delay_ms)
+      start(delay_ms)
       open_file("alpha beta gamma")
       select_and_release()
 
@@ -115,7 +125,7 @@ describe("a held selection with the real plugin", function()
   end
 
   it("keeps the selection through a terminal that only its name says is Claude's, in the same window", function()
-    start({ provider = "none" }, 50)
+    start(50)
     open_file("alpha beta gamma")
     local file_buf = vim.api.nvim_get_current_buf()
     vim.cmd("terminal sh -c 'sleep 60' claude")
@@ -136,7 +146,7 @@ describe("a held selection with the real plugin", function()
   end)
 
   it("reports the cursor when an operator consumes a different selection, before you enter the terminal", function()
-    start({ provider = "none" }, 50)
+    start(50)
     open_file("alpha beta gamma")
     local file_buf = vim.api.nvim_get_current_buf()
     vim.cmd("terminal sh -c 'sleep 60' claude")
@@ -173,7 +183,7 @@ describe("a held selection with the real plugin", function()
     end
 
     it("reports the cursor when a plugin edits the text, and the file is not in a window", function()
-      start({ provider = "none" }, 50)
+      start(50)
       open_file("alpha beta gamma")
       local file_buf = vim.api.nvim_get_current_buf()
       vim.cmd("terminal sh -c 'sleep 60' claude")
@@ -197,7 +207,7 @@ describe("a held selection with the real plugin", function()
     end)
 
     it("reports the cursor of the file's window when Neovim reloads the file", function()
-      start({ provider = "none" }, 50)
+      start(50)
       open_file("alpha beta gamma")
       local file_buf = vim.api.nvim_get_current_buf()
       local file_win = vim.api.nvim_get_current_win()
@@ -225,7 +235,7 @@ describe("a held selection with the real plugin", function()
     -- :bunload! detaches the listener, and nvim_buf_attach cannot attach to an unloaded buffer. When the file is loaded
     -- again and selected from, a new listener must be attached.
     it("listens again when the file was unloaded and a new selection is read after it loads again", function()
-      start({ provider = "none" }, 50)
+      start(50)
       open_file("alpha beta gamma")
       local file_buf = vim.api.nvim_get_current_buf()
       vim.cmd("terminal sh -c 'sleep 60' claude")
@@ -259,7 +269,7 @@ describe("a held selection with the real plugin", function()
     -- term://...claude name. Its text then changes: the check used to call update_selection, which called the check
     -- again, until "stack overflow".
     it("does not overflow the stack when the buffer of the held selection is taken for the Claude terminal", function()
-      start({ provider = "none" }, 50)
+      start(50)
       open_file("alpha beta gamma")
       local file_buf = vim.api.nvim_get_current_buf()
       select_and_release()
@@ -280,7 +290,7 @@ describe("a held selection with the real plugin", function()
     -- The demotion timer is pending when the buffer becomes the terminal. When it fires it only knows the terminal
     -- that the provider registered, so it used to take this buffer for an ordinary one and send its cursor.
     it("does not send a cursor of the buffer that became the Claude terminal when a demotion is pending", function()
-      start({ provider = "none" }, 1000)
+      start(1000)
       open_file("alpha beta gamma")
       local file_buf = vim.api.nvim_get_current_buf()
       select_and_release()
@@ -299,7 +309,7 @@ describe("a held selection with the real plugin", function()
     -- You are in a Claude terminal, and the buffer of the held selection becomes a Claude terminal too. Its text changes.
     -- The check sent the cursor of that buffer, with its term:// path.
     it("sends nothing when the buffer of the held selection became a Claude terminal and you are in another", function()
-      start({ provider = "none" }, 50)
+      start(50)
       open_file("alpha beta gamma")
       local file_buf = vim.api.nvim_get_current_buf()
       vim.cmd("terminal sh -c 'sleep 60' claude")
@@ -326,7 +336,7 @@ describe("a held selection with the real plugin", function()
     -- Neovim ignores what on_reload returns and keeps the listener. A listener that forgot its buffer there would let
     -- the next selection attach a second one, one more after every reload.
     it("keeps one listener on the file through reloads while Claude holds only a cursor", function()
-      start({ provider = "none" }, 50)
+      start(50)
       open_file("alpha beta gamma")
       local file_buf = vim.api.nvim_get_current_buf()
       local attached = 0
@@ -356,7 +366,7 @@ describe("a held selection with the real plugin", function()
     end)
 
     it("keeps the selection when a reload leaves its text in place", function()
-      start({ provider = "none" }, 50)
+      start(50)
       open_file("alpha beta gamma")
       local file_buf = vim.api.nvim_get_current_buf()
       local file_win = vim.api.nvim_get_current_win()
@@ -387,7 +397,7 @@ describe("a held selection with the real plugin", function()
   -- neither raise nor keep the selection of a file you left.
   for _, kind in ipairs({ "bufhidden=wipe left with :buffer #", "nvim_buf_delete of the displayed buffer" }) do
     it("ends the selection without an error when the buffer you visited is wiped (" .. kind .. ")", function()
-      start({ provider = "none" }, 50)
+      start(50)
       open_file("alpha beta gamma")
       local file_buf = vim.api.nvim_get_current_buf()
       select_and_release()

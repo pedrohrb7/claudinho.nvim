@@ -234,13 +234,13 @@ describe("sessions", function()
     end)
 
     it("shows the error and leaves no tab when the session does not start", function()
-      state.start_error = "Cannot start Claude 1: `claude` is not executable"
+      state.start_error = "Could not start Claude 1: `claude` is not executable"
 
       local s, err = sessions.new()
 
       assert.is_nil(s)
-      assert.equals("Cannot start Claude 1: `claude` is not executable", err)
-      assert.same({ { "error", "Cannot start Claude 1: `claude` is not executable" } }, state.notices)
+      assert.equals("Could not start Claude 1: `claude` is not executable", err)
+      assert.same({ { "error", "Could not start Claude 1: `claude` is not executable" } }, state.notices)
       assert.is_nil(sessions.active())
       assert.same({}, sessions.state.tabs)
       assert.equals(0, #state.window_show)
@@ -488,14 +488,14 @@ describe("sessions", function()
       local s = assert(sessions.new())
       s.state = "exited"
       require("claudinho.session").restart = function()
-        return false, "Cannot start Claude 1: the command did not start"
+        return false, "Could not start Claude 1: the command did not start"
       end
 
       local ok, err = sessions.restart(1)
 
       assert.is_false(ok)
-      assert.equals("Cannot start Claude 1: the command did not start", err)
-      assert.same({ { "error", "Cannot start Claude 1: the command did not start" } }, state.notices)
+      assert.equals("Could not start Claude 1: the command did not start", err)
+      assert.same({ { "error", "Could not start Claude 1: the command did not start" } }, state.notices)
     end)
   end)
 

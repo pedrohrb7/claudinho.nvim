@@ -1,25 +1,28 @@
--- Real-Neovim checks of :ClaudeCodeCloseAllDiffs finishing an accepted diff whose Claude client exited: the accepted
+-- Real-Neovim checks of :Claudinho close-all-diffs finishing an accepted diff whose Claude client exited: the accepted
 -- text goes into the file's buffer, and the user's :w writes it. Neovim's own file format, encoding, and write rules
 -- decide the bytes, so under busted's mock vim this is pending; scripts/run_integration_tests_individually.sh runs it
 -- in Neovim.
 if vim == nil or vim.fn.has("nvim") ~= 1 then
-  describe(":ClaudeCodeCloseAllDiffs hand-over", function()
+  describe(":Claudinho close-all-diffs hand-over", function()
     pending("needs a real Neovim")
   end)
   return
 end
 
-describe(":ClaudeCodeCloseAllDiffs hand-over", function()
+describe(":Claudinho close-all-diffs hand-over", function()
   local diff = require("claudinho.diff")
   local tools = require("claudinho.tools.init")
   local owner = { id = "hand_over_spec_client" }
-  local dir, notes, real_notify, real_bufload
+  local dir, notes, real_notify, real_bufload, real_config
 
   before_each(function()
     dir = vim.fn.tempname()
     vim.fn.mkdir(dir, "p")
     tools.register_all()
-    require("claudinho")._create_commands()
+    require("claudinho.commands").setup({})
+    -- The summaries of the command are informative notices, shown only with notify = true.
+    real_config = require("claudinho").state.config
+    require("claudinho").state.config = vim.tbl_extend("force", real_config, { notify = true })
     _G.claude_deferred_responses = {}
     notes = {}
     real_bufload = vim.fn.bufload
@@ -30,6 +33,7 @@ describe(":ClaudeCodeCloseAllDiffs hand-over", function()
   end)
 
   after_each(function()
+    require("claudinho").state.config = real_config
     vim.notify = real_notify
     vim.fn.bufload = real_bufload
     diff.setup(nil)
@@ -81,7 +85,7 @@ describe(":ClaudeCodeCloseAllDiffs hand-over", function()
   end
 
   local function close_all_then_write(path)
-    vim.cmd("ClaudeCodeCloseAllDiffs")
+    vim.cmd("Claudinho close-all-diffs")
     local buf = vim.fn.bufnr(path)
     assert.are_not.equal(-1, buf, "the file's buffer holds the accepted text")
     vim.api.nvim_buf_call(buf, function()
@@ -122,7 +126,7 @@ describe(":ClaudeCodeCloseAllDiffs hand-over", function()
     assert.is_true(vim.bo.readonly)
     accept_then_client_exits(path, "alpha accepted\n")
 
-    vim.cmd("ClaudeCodeCloseAllDiffs")
+    vim.cmd("Claudinho close-all-diffs")
 
     assert.is_truthy(notes[#notes]:find(": :checktime, then :w! writes them", 1, true), notes[#notes])
     vim.api.nvim_buf_call(vim.fn.bufnr(path), function()
@@ -180,7 +184,7 @@ describe(":ClaudeCodeCloseAllDiffs hand-over", function()
     assert.equal("latin1", vim.bo.fileencoding)
     accept_then_client_exits(path, "café costs 5 €\n")
 
-    vim.cmd("ClaudeCodeCloseAllDiffs")
+    vim.cmd("Claudinho close-all-diffs")
 
     assert.are.same({ "café costs 5 €" }, vim.api.nvim_buf_get_lines(vim.fn.bufnr(path), 0, -1, false))
     assert.is_truthy(notes[#notes]:find(":set fileencoding=utf-8 (latin1 cannot hold them), then :w", 1, true))
@@ -190,7 +194,7 @@ describe(":ClaudeCodeCloseAllDiffs hand-over", function()
     local path = dir .. "/new folder/created.txt"
     accept_then_client_exits(path, "created\n")
 
-    vim.cmd("ClaudeCodeCloseAllDiffs")
+    vim.cmd("Claudinho close-all-diffs")
 
     -- Neovim 0.8 has no :w ++p.
     local write = vim.fn.has("nvim-0.9") == 1 and ":w ++p" or ":call mkdir(expand('%:p:h'), 'p') | w"
@@ -214,7 +218,7 @@ describe(":ClaudeCodeCloseAllDiffs hand-over", function()
       end,
     })
 
-    vim.cmd("ClaudeCodeCloseAllDiffs")
+    vim.cmd("Claudinho close-all-diffs")
 
     assert.equal("saved", diff._get_active_diffs()[tab].status)
     assert.is_truthy(notes[#notes]:find(": Buffer is not 'modifiable'$"), notes[#notes])
@@ -268,7 +272,7 @@ describe(":ClaudeCodeCloseAllDiffs hand-over", function()
         return real_bufload(buf)
       end
 
-      vim.cmd("ClaudeCodeCloseAllDiffs")
+      vim.cmd("Claudinho close-all-diffs")
 
       assert.equal("saved", diff._get_active_diffs()[tab].status)
       local step = notes[#notes]:match("open it with :(split .-) %(answer the swap file prompt")
@@ -277,7 +281,7 @@ describe(":ClaudeCodeCloseAllDiffs hand-over", function()
       swap_answered = true
       vim.cmd(step)
       assert.equal(vim.fn.resolve(path), vim.fn.resolve(vim.api.nvim_buf_get_name(0)), "the step opens the file")
-      vim.cmd("ClaudeCodeCloseAllDiffs")
+      vim.cmd("Claudinho close-all-diffs")
       assert.is_nil(diff._get_active_diffs()[tab], notes[#notes])
       assert.are.same({ "alpha accepted" }, vim.api.nvim_buf_get_lines(vim.fn.bufnr(path), 0, -1, false))
     end)
@@ -293,12 +297,12 @@ describe(":ClaudeCodeCloseAllDiffs hand-over", function()
     })
     _G.claude_deferred_responses[tostring(call.coroutine)] = function() end
     vim.api.nvim_buf_call(diff._get_active_diffs()[tab].new_buffer, function()
-      vim.cmd("ClaudeCodeDiffDeny")
+      vim.cmd("Claudinho diff-deny")
     end)
     diff.close_diffs_for_client(owner.id, "client disconnected")
     assert.equal("rejected", diff._get_active_diffs()[tab].status)
 
-    vim.cmd("ClaudeCodeCloseAllDiffs")
+    vim.cmd("Claudinho close-all-diffs")
 
     assert.is_nil(diff._get_active_diffs()[tab])
     assert.are.same({ "Closed 1 rejected Claude diff(s)" }, notes)

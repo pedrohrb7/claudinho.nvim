@@ -1,4 +1,4 @@
---- A command typed in Select mode, for example through a `<cmd>ClaudeCodeSend<CR>` mapping, has the same selection as
+--- A command typed in Select mode, for example through a `<cmd>Claudinho send<CR>` mapping, has the same selection as
 --- in Visual mode, so it must take the visual path.
 require("tests.busted_setup")
 

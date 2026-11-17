@@ -70,27 +70,14 @@
 ---@field file_path string Absolute path Claude received (a directory ends in /)
 ---@field start_line number? Start line, 0-indexed for Claude, or nil
 ---@field end_line number? End line, 0-indexed for Claude, or nil
----@field context string? Internal logging tag (e.g. "ClaudeCodeSend"); best-effort, may change
-
--- Terminal provider interface
----@class ClaudinhoTerminalProvider
----@field setup fun(config: ClaudinhoTerminalConfig)
----@field open fun(cmd_string: string, env_table: table, config: ClaudinhoTerminalConfig, focus: boolean?)
----@field close fun()
----@field toggle fun(cmd_string: string, env_table: table, effective_config: ClaudinhoTerminalConfig)
----@field simple_toggle fun(cmd_string: string, env_table: table, effective_config: ClaudinhoTerminalConfig)
----@field focus_toggle fun(cmd_string: string, env_table: table, effective_config: ClaudinhoTerminalConfig)
----@field get_active_bufnr fun(): number?
----@field is_available fun(): boolean
----@field ensure_visible? function
----@field _get_terminal_for_test fun(): table?
+---@field context string? Internal logging tag (e.g. "Claudinho send"); best-effort, may change
 
 -- Terminal configuration
 ---@class ClaudinhoTerminalConfig
 ---@field split_side ClaudinhoSplitSide
 ---@field split_width_percentage number
 ---@field diff_split_width_percentage number? -- optional terminal width while a diff is active; defaults to split_width_percentage
----@field provider ClaudinhoTerminalProviderName|ClaudinhoTerminalProvider
+---@field provider ClaudinhoTerminalProviderName
 ---@field show_native_term_exit_tip boolean
 ---@field terminal_cmd string?
 ---@field provider_opts ClaudinhoTerminalProviderOptions?
@@ -196,19 +183,9 @@
 ---@field tabpage integer|nil
 ---@field hidden_by_diff boolean -- a diff hid the float; only toggle, open or focus bring it back
 
--- Server interface for main module
----@class ClaudinhoServerFacade
----@field start fun(config: ClaudinhoConfig, auth_token: string|nil): (success: boolean, port_or_error: number|string)
----@field stop fun(): (success: boolean, error_message: string?)
----@field broadcast fun(method: string, params: table?): boolean
----@field get_status fun(): ClaudinhoServerStatus
-
 -- Main module state
 ---@class ClaudinhoState
 ---@field config ClaudinhoConfig
----@field server ClaudinhoServerFacade|nil
----@field port integer|nil
----@field auth_token string|nil
 ---@field initialized boolean
 
 -- This module only defines types, no runtime functionality

@@ -15,6 +15,16 @@ M.state = { tabs = {}, active = nil, by_server = {} }
 
 local AUGROUP = "ClaudinhoSessions"
 
+---The reply of a command that needs a tab when there is none.
+M.NO_TABS = "No Claude tabs open"
+
+---The reply of a send to a tab whose process ended (spec section 4).
+---@param s ClaudinhoSession
+---@return string
+function M.exited_message(s)
+  return ("Claude %d has exited; run :Claudinho tab-restart %d"):format(s.number, s.number)
+end
+
 ---@param n integer
 ---@return string
 local function label(n)
@@ -181,7 +191,7 @@ function M.new(extra_args)
   local s = require("claudinho.session").new(n, plugin_config(), { format_path = format_path })
   local ok, err = require("claudinho.session").start(s, extra_args)
   if not ok then
-    err = err or ("Cannot start " .. label(n))
+    err = err or ("Could not start " .. label(n))
     notify.error(err)
     return nil, err
   end
@@ -318,7 +328,7 @@ function M.restart(n)
   local ok, err = require("claudinho.session").restart(s)
   if not ok then
     redraw()
-    err = err or ("Cannot restart " .. label(n))
+    err = err or ("Could not start " .. label(n))
     if s.state == "running" then
       notify.reply(err)
     else

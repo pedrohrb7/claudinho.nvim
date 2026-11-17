@@ -1,7 +1,7 @@
 --- Health check for claudinho.nvim, run via :checkhealth claudinho
---- Verifies prerequisites (Neovim version, Claude CLI, terminal provider)
---- and reports live integration state (WebSocket server, lock file,
---- Claude connection) without launching anything.
+--- Verifies prerequisites (Neovim version, Claude CLI) and reports the live
+--- state of each Claude tab (process, WebSocket server, lock file) without
+--- launching anything.
 ---@module 'claudinho.health'
 local M = {}
 
@@ -69,67 +69,71 @@ local function check_cli(config)
 end
 
 ---@param config table The merged plugin config
-local function check_terminal_provider(config)
-  local provider = config.terminal and config.terminal.provider or "auto"
-  if type(provider) == "table" then
-    info("Terminal provider: custom (table)")
-    return
-  end
-
-  if provider == "auto" then
-    ok("Terminal provider 'auto': native terminal")
-  elseif provider == "external" then
-    local cmd = config.terminal.provider_opts and config.terminal.provider_opts.external_terminal_cmd
-    if cmd and (type(cmd) == "function" or cmd:find("%%s")) then
-      ok("Terminal provider 'external' configured")
-    else
-      error_("Terminal provider 'external' requires provider_opts.external_terminal_cmd containing '%s'")
-    end
-  else
-    ok(("Terminal provider: %s"):format(provider))
+local function check_notify(config)
+  if config.notify ~= true then
+    info("Informative notifications are off (notify = false)")
   end
 end
 
----@param claudinho table The main plugin module
-local function check_server(claudinho)
-  local server = require("claudinho.server.init")
-  local status = server.get_status()
-
-  if not status.running then
-    warn("WebSocket server is not running", {
-      "The server starts automatically when auto_start = true (default)",
-      "Or start it manually with :ClaudeCodeStart",
+---The lock file of a running tab: present, or why it is not.
+---@param n integer The tab number
+---@param port integer
+---@param lock_path string
+local function check_lock_file(n, port, lock_path)
+  if vim.fn.filereadable(lock_path) == 1 then
+    return
+  end
+  -- `filereadable` is 0 for a missing file, a folder, and a file that exists but cannot be read (mode 000). Only the
+  -- first two are missing.
+  local stat = vim.loop.fs_stat(lock_path)
+  if stat and stat.type ~= "directory" then
+    error_(("Claude %d: the lock file exists but cannot be read: %s"):format(n, lock_path), {
+      "Claude discovers this Neovim instance through the lock file, and it must be able to read it",
+      ("Make the file readable by you (mode 600), or restart the tab with :Claudinho tab-close %d and :Claudinho new"):format(
+        n
+      ),
     })
+  else
+    error_(("Claude %d: the lock file is missing: %s (port %d)"):format(n, lock_path, port), {
+      "Claude discovers this Neovim instance through the lock file",
+      ("Close the tab with :Claudinho tab-close %d and open another with :Claudinho new"):format(n),
+    })
+  end
+end
+
+---One line per tab: its process, port, clients and lock file.
+local function check_tabs()
+  local state = require("claudinho.sessions").state
+  local numbers = {}
+  for n in pairs(state.tabs) do
+    numbers[#numbers + 1] = n
+  end
+  table.sort(numbers)
+
+  if #numbers == 0 then
+    info("No Claude tabs open")
     return
   end
 
-  ok(("WebSocket server running on port %d"):format(status.port))
-
   local lockfile = require("claudinho.lockfile")
-  local lock_path = lockfile.lock_dir .. "/" .. tostring(status.port) .. ".lock"
-  if vim.fn.filereadable(lock_path) == 1 then
-    ok("Lock file present: " .. lock_path)
-  else
-    -- `filereadable` is 0 for a missing file, a folder, and a file that exists but cannot be read (mode 000). Only
-    -- the first two are missing.
-    local stat = vim.loop.fs_stat(lock_path)
-    if stat and stat.type ~= "directory" then
-      error_("Lock file exists but cannot be read: " .. lock_path, {
-        "Claude discovers this Neovim instance through the lock file, and it must be able to read it",
-        "Make the file readable by you (mode 600), or restart the integration with :ClaudeCodeStop and :ClaudeCodeStart",
-      })
+  for _, n in ipairs(numbers) do
+    local s = state.tabs[n]
+    if s.state ~= "running" then
+      info(("Claude %d: exited (code %s)"):format(n, tostring(s.exit_code)))
     else
-      error_("Lock file missing: " .. lock_path, {
-        "Claude discovers this Neovim instance through the lock file",
-        "Restart the integration with :ClaudeCodeStop and :ClaudeCodeStart",
-      })
+      local status = s.server and s.server:get_status() or { client_count = 0 }
+      local port = s.lock_port or status.port
+      local lock_path = lockfile.lock_dir .. "/" .. tostring(port) .. ".lock"
+      ok(
+        ("Claude %d: running, port %s, %d client(s), lock file %s"):format(
+          n,
+          tostring(port),
+          status.client_count or 0,
+          lock_path
+        )
+      )
+      check_lock_file(n, port, lock_path)
     end
-  end
-
-  if claudinho.is_claude_connected() then
-    ok(("Claude Code is connected (%d client(s))"):format(status.client_count))
-  else
-    info("No Claude Code client connected yet (launch one with :ClaudeCode)")
   end
 end
 
@@ -149,8 +153,8 @@ function M.check()
   end
 
   check_cli(claudinho.state.config)
-  check_terminal_provider(claudinho.state.config)
-  check_server(claudinho)
+  check_notify(claudinho.state.config)
+  check_tabs()
 end
 
 return M

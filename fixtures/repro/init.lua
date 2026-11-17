@@ -23,12 +23,7 @@ local ok, claudinho = pcall(require, "claudinho")
 assert(ok, "Failed to load claudinho.nvim from repo root: " .. tostring(claudinho))
 
 claudinho.setup({
-  auto_start = false, -- avoid noisy startup + make restarts deterministic
   log_level = "debug",
-  terminal = {
-    provider = "native",
-    auto_close = false,
-  },
   diff_opts = {
     layout = "vertical",
     open_in_new_tab = false,
@@ -36,47 +31,11 @@ claudinho.setup({
   },
 })
 
-local function ensure_claudinho_started()
-  local ok_start, started_or_err, port_or_err = pcall(function()
-    return claudinho.start(false)
-  end)
-
-  if not ok_start then
-    vim.notify("Claudinho start crashed: " .. tostring(started_or_err), vim.log.levels.ERROR)
-    return false
-  end
-
-  local started = started_or_err
-  if started then
-    return true
-  end
-
-  -- start() returns false + "Already running" when running.
-  if port_or_err == "Already running" then
-    return true
-  end
-
-  vim.notify("Claudinho failed to start: " .. tostring(port_or_err), vim.log.levels.ERROR)
-  return false
-end
-
 -- Keymaps (kept small on purpose)
-vim.keymap.set("n", "<leader>ac", function()
-  if ensure_claudinho_started() then
-    local terminal = require("claudinho.terminal")
-    terminal.simple_toggle({}, nil)
-  end
-end, { desc = "Toggle Claude" })
-
-vim.keymap.set("n", "<leader>af", function()
-  if ensure_claudinho_started() then
-    local terminal = require("claudinho.terminal")
-    terminal.focus_toggle({}, nil)
-  end
-end, { desc = "Focus Claude" })
-
-vim.keymap.set("n", "<leader>aa", "<cmd>ClaudeCodeDiffAccept<cr>", { desc = "Accept diff" })
-vim.keymap.set("n", "<leader>ad", "<cmd>ClaudeCodeDiffDeny<cr>", { desc = "Deny diff" })
+vim.keymap.set("n", "<leader>ac", "<cmd>Claudinho toggle<cr>", { desc = "Toggle Claude" })
+vim.keymap.set("n", "<leader>af", "<cmd>Claudinho focus<cr>", { desc = "Focus Claude" })
+vim.keymap.set("n", "<leader>aa", "<cmd>Claudinho diff-accept<cr>", { desc = "Accept diff" })
+vim.keymap.set("n", "<leader>ad", "<cmd>Claudinho diff-deny<cr>", { desc = "Deny diff" })
 
 -- Convenience helpers for iterating on this fixture.
 vim.api.nvim_create_user_command("ReproEditConfig", function()

@@ -221,7 +221,7 @@ function M.start(session, extra_args)
   local argv = utils.parse_command(session.base_cmd)
   if #argv == 0 or vim.fn.executable(argv[1]) ~= 1 then
     return false,
-      "Cannot start " .. label(session) .. ": `" .. tostring(argv[1] or session.base_cmd) .. "` is not executable"
+      "Could not start " .. label(session) .. ": `" .. tostring(argv[1] or session.base_cmd) .. "` is not executable"
   end
 
   -- What was made so far, undone in the inverse order by `undo`.
@@ -249,7 +249,7 @@ function M.start(session, extra_args)
 
   local token_ok, token = pcall(lockfile.generate_auth_token)
   if not token_ok then
-    return false, "Cannot start " .. label(session) .. ": no authentication token (" .. tostring(token) .. ")"
+    return false, "Could not start " .. label(session) .. ": " .. tostring(token)
   end
 
   local server = require("claudinho.server.init").new({
@@ -270,7 +270,7 @@ function M.start(session, extra_args)
   })
   local started, port = server:start(config, token)
   if not started then
-    return false, "Cannot start " .. label(session) .. ": the server did not start (" .. tostring(port) .. ")"
+    return false, "Could not start " .. label(session) .. ": " .. tostring(port)
   end
   made.server = server
   -- A started server answers with its port; the error text is only for a failed start.
@@ -281,13 +281,13 @@ function M.start(session, extra_args)
     workspace_folders = lockfile.get_workspace_folders(session.cwd),
   })
   if not lock_ok then
-    return undo("Cannot start " .. label(session) .. ": no lock file (" .. tostring(lock_result) .. ")")
+    return undo("Could not start " .. label(session) .. ": " .. tostring(lock_result))
   end
   made.lock_port = port
 
   local settings_path, settings_err = require("claudinho.session_settings").write(session)
   if not settings_path then
-    return undo("Cannot start " .. label(session) .. ": no settings file (" .. tostring(settings_err) .. ")")
+    return undo("Could not start " .. label(session) .. ": " .. tostring(settings_err))
   end
   made.settings = true
 
@@ -329,15 +329,15 @@ function M.start(session, extra_args)
     end
   end)
   if not call_ok then
-    return undo("Cannot start " .. label(session) .. ": " .. tostring(call_err))
+    return undo("Could not start " .. label(session) .. ": " .. tostring(call_err))
   end
   if type(job) ~= "number" or job <= 0 then
-    return undo("Cannot start " .. label(session) .. ": the command did not start")
+    return undo("Could not start " .. label(session) .. ": the command did not start")
   end
   made.job = job
   if not vim.api.nvim_buf_is_valid(buf) then
     made.buf = nil
-    return undo("Cannot start " .. label(session) .. ": its buffer was deleted while it started")
+    return undo("Could not start " .. label(session) .. ": its buffer was deleted while it started")
   end
 
   vim.bo[buf].filetype = "claudinho"

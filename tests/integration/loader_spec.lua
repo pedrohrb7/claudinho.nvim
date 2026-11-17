@@ -23,6 +23,7 @@ describe("claudecode.nvim guard", function()
       "  'ok=' .. tostring(ok),",
       "  'count=' .. count,",
       "  'start=' .. vim.fn.exists(':ClaudeCodeStart'),",
+      "  'cmd=' .. vim.fn.exists(':Claudinho'),",
       "}, ';'))",
     }, "\n")
     vim.fn.writefile(vim.split(code, "\n"), script)
@@ -51,7 +52,8 @@ describe("claudecode.nvim guard", function()
     local out = run("")
     assert.is_truthy(out:find("ok=true", 1, true), out)
     assert.is_truthy(out:find("count=0", 1, true), out)
-    assert.is_truthy(out:find("start=2", 1, true), out)
+    assert.is_truthy(out:find("cmd=2", 1, true), out)
+    assert.is_truthy(out:find("start=0", 1, true), out)
   end)
 
   it("warns once and does not set up when claudecode.nvim is on the runtimepath and setup() runs from init", function()

@@ -52,7 +52,7 @@ describe("a ClaudinhoDiffOpened handler that resolves the diff (#325)", function
     os.remove(old_file)
   end)
 
-  -- Stands in for `callback = function() vim.cmd("ClaudeCodeDiffDeny") end`. Neovim runs the
+  -- Stands in for `callback = function() vim.cmd("Claudinho diff-deny") end`. Neovim runs the
   -- handler with the proposal window current, so the command finds the proposal buffer.
   local function on_diff_opened(command)
     vim.api.nvim_exec_autocmds = function(event, opts)
@@ -87,8 +87,8 @@ describe("a ClaudinhoDiffOpened handler that resolves the diff (#325)", function
   end
 
   local cases = {
-    { command = "ClaudeCodeDiffDeny", run = diff.deny_current_diff, answer = "DIFF_REJECTED" },
-    { command = "ClaudeCodeDiffAccept", run = diff.accept_current_diff, answer = "FILE_SAVED" },
+    { command = "Claudinho diff-deny", run = diff.deny_current_diff, answer = "DIFF_REJECTED" },
+    { command = "Claudinho diff-accept", run = diff.accept_current_diff, answer = "FILE_SAVED" },
   }
 
   for _, layout in ipairs({ "vertical", "unified" }) do

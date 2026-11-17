@@ -4,6 +4,8 @@ require("tests.mocks.vim")
 describe("focus_after_send behavior", function()
   local saved_require
   local claudinho
+  local tab
+  local active_tab = require("tests.helpers.active_tab")
 
   local mock_terminal
   local mock_logger
@@ -77,6 +79,8 @@ describe("focus_after_send behavior", function()
   end
 
   local function teardown_mocks()
+    active_tab.uninstall(tab)
+    tab = nil
     _G.require = saved_require
     package.loaded["claudinho"] = nil
     package.loaded["claudinho.config"] = nil
@@ -94,10 +98,10 @@ describe("focus_after_send behavior", function()
     setup_mocks(true)
 
     claudinho = require("claudinho")
-    claudinho.setup({})
+    claudinho.state.config = require("claudinho.config").apply()
+    tab = active_tab.install({ server = mock_server_facade })
 
-    -- Mark server as present and stub low-level broadcast to succeed
-    claudinho.state.server = mock_server_facade
+    -- Stub the low-level broadcast to succeed
     claudinho._broadcast_at_mention = spy.new(function()
       return true, nil
     end)
@@ -116,9 +120,9 @@ describe("focus_after_send behavior", function()
     setup_mocks(false)
 
     claudinho = require("claudinho")
-    claudinho.setup({})
+    claudinho.state.config = require("claudinho.config").apply()
+    tab = active_tab.install({ server = mock_server_facade })
 
-    claudinho.state.server = mock_server_facade
     claudinho._broadcast_at_mention = spy.new(function()
       return true, nil
     end)

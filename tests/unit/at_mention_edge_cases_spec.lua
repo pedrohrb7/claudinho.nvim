@@ -4,6 +4,8 @@ require("tests.busted_setup")
 describe("At Mention Edge Cases", function()
   local init_module
   local mock_vim
+  local tab
+  local active_tab = require("tests.helpers.active_tab")
 
   local function setup_mocks()
     package.loaded["claudinho.init"] = nil
@@ -84,6 +86,11 @@ describe("At Mention Edge Cases", function()
   before_each(function()
     setup_mocks()
     init_module = require("claudinho.init")
+    tab = active_tab.install({ server = { broadcast = function() end } })
+  end)
+
+  after_each(function()
+    active_tab.uninstall(tab)
   end)
 
   describe("format_path_for_at_mention validation", function()
@@ -203,9 +210,8 @@ describe("At Mention Edge Cases", function()
           opened = opened + 1
         end,
       }
-      init_module.state.server = { broadcast = function() end }
       init_module.state.config = { connection_timeout = 10000, connection_wait_delay = 600 }
-      init_module.default_queue():clear()
+      tab.queue:clear()
       init_module.is_claude_connected = function()
         return false
       end
@@ -213,12 +219,12 @@ describe("At Mention Edge Cases", function()
 
     after_each(function()
       package.loaded["claudinho.terminal"] = nil
-      init_module.default_queue():clear()
+      tab.queue:clear()
     end)
 
     it("queues the absolute path, so a later :cd cannot change the file", function()
       expect(init_module.send_at_mention("src/file.lua", 1, 2)).to_be_true()
-      local queued = init_module.default_queue().mentions[1]
+      local queued = tab.queue.mentions[1]
       expect(queued.file_path).to_be("/Users/test/project/src/file.lua")
       expect(queued.start_line).to_be(1)
       expect(queued.end_line).to_be(2)
@@ -227,7 +233,7 @@ describe("At Mention Edge Cases", function()
 
     it("queues a directory with a trailing slash and no line numbers", function()
       init_module.send_at_mention("/Users/test/project/lua", 1, 2)
-      local queued = init_module.default_queue().mentions[1]
+      local queued = tab.queue.mentions[1]
       expect(queued.file_path).to_be("/Users/test/project/lua/")
       expect(queued.start_line).to_be_nil()
       expect(queued.end_line).to_be_nil()
@@ -237,7 +243,7 @@ describe("At Mention Edge Cases", function()
       local success, err = init_module.send_at_mention("", 1, 2)
       expect(success).to_be_false()
       assert_contains(err, "file_path must be a non-empty string")
-      expect(#init_module.default_queue().mentions).to_be(0)
+      expect(#tab.queue.mentions).to_be(0)
       expect(opened).to_be(0)
     end)
   end)
@@ -245,11 +251,11 @@ describe("At Mention Edge Cases", function()
   describe("broadcast_at_mention error handling", function()
     it("should handle format_path_for_at_mention errors gracefully", function()
       -- Mock a running server
-      init_module.state = { server = {
+      tab.server = {
         broadcast = function()
           return true
         end,
-      } }
+      }
 
       -- Temporarily simulate production environment
       local old_busted = package.loaded["busted"]
@@ -264,22 +270,22 @@ describe("At Mention Edge Cases", function()
       package.loaded["busted"] = old_busted
     end)
 
-    it("should handle server not running", function()
-      init_module.state = { server = nil }
+    it("should handle no tab open", function()
+      tab.closed = true
 
       local success, error_msg = init_module._broadcast_at_mention("/Users/test/project/config.lua")
       expect(success).to_be_false()
       expect(error_msg).to_be_string()
-      assert_contains(error_msg, "not running")
+      assert_contains(error_msg, "No Claude tabs open")
     end)
 
     it("should handle broadcast failures", function()
       -- Mock a server that fails to broadcast
-      init_module.state = { server = {
+      tab.server = {
         broadcast = function()
           return false
         end,
-      } }
+      }
 
       local success, error_msg = init_module._broadcast_at_mention("/Users/test/project/config.lua")
       expect(success).to_be_false()
@@ -290,11 +296,11 @@ describe("At Mention Edge Cases", function()
 
   describe("add_paths_to_claude error scenarios", function()
     it("should handle empty file list", function()
-      init_module.state = { server = {
+      tab.server = {
         broadcast = function()
           return true
         end,
-      } }
+      }
 
       local success_count, total_count = init_module._add_paths_to_claude({})
       expect(success_count).to_be(0)
@@ -302,11 +308,11 @@ describe("At Mention Edge Cases", function()
     end)
 
     it("should handle nil file list", function()
-      init_module.state = { server = {
+      tab.server = {
         broadcast = function()
           return true
         end,
-      } }
+      }
 
       local success_count, total_count = init_module._add_paths_to_claude(nil)
       expect(success_count).to_be(0)
@@ -314,13 +320,11 @@ describe("At Mention Edge Cases", function()
     end)
 
     it("should handle mixed success and failure", function()
-      init_module.state = {
-        server = {
-          broadcast = function(event, params)
-            -- Fail for files with "fail" in the name
-            return not string.match(params.filePath, "fail")
-          end,
-        },
+      tab.server = {
+        broadcast = function(event, params)
+          -- Fail for files with "fail" in the name
+          return not string.match(params.filePath, "fail")
+        end,
       }
 
       local files = {
@@ -335,12 +339,10 @@ describe("At Mention Edge Cases", function()
     end)
 
     it("should provide user notifications for mixed results", function()
-      init_module.state = {
-        server = {
-          broadcast = function(event, params)
-            return not string.match(params.filePath, "fail")
-          end,
-        },
+      tab.server = {
+        broadcast = function(event, params)
+          return not string.match(params.filePath, "fail")
+        end,
       }
 
       local files = {
@@ -361,11 +363,11 @@ describe("At Mention Edge Cases", function()
     end)
 
     it("should handle all failures", function()
-      init_module.state = { server = {
+      tab.server = {
         broadcast = function()
           return false
         end,
-      } }
+      }
 
       local files = {
         "/Users/test/project/file1.lua",

@@ -8,6 +8,23 @@ Claudinho.nvim is a hard fork of [claudecode.nvim](https://github.com/coder/clau
 
 ## [Unreleased]
 
+### Changed
+
+- The whole API is now one command, `:Claudinho <subcommand>`: `toggle` (also what `:Claudinho` does alone), `open`, `hide`, `focus`, `new`, `tab <n>`, `tab-next`, `tab-prev`, `tab-close [n]`, `tab-restart <n>`, `kill-all`, `send`, `add <file> [start] [end]`, `tree-add`, `send-text <text>`, `diff-accept`, `diff-deny`, `close-all-diffs` and `select-model`. The command has completion for the subcommands, the tab numbers and files.
+- `send`, `add`, `tree-add` and `send-text` act on the active Claude tab. With no tab, `send`, `add` and `tree-add` start the first one and deliver when it connects; with the active tab ended, they reply `Claude <n> has exited; run :Claudinho tab-restart <n>` and send nothing.
+- `:Claudinho close-all-diffs` also rejects the diffs that wait for a tab in the background. Its summaries are informative notices, shown with `notify = true`; its warnings and `No Claude diffs to close` always show.
+- `setup()` starts no server, process or lock file: each tab starts its own. It enables the selection tracking (`track_selection`), the tab cleanup on exit and the commands.
+- `:checkhealth claudinho` reports each tab (process, port, clients, lock file), says when no tab is open and when informative notifications are off. The terminal provider check is gone.
+- `terminal.lua` is now a facade over the active tab (`setup`, `get_active_terminal_bufnr`, `ensure_visible`, `open`, `send_to_terminal`).
+- The log context of the send commands is now `Claudinho send`, `Claudinho add` and so on (it was `ClaudeCodeSend`, `ClaudeCodeAdd`...), also in the `context` field of `User ClaudinhoSendComplete`.
+- `keymaps = { preset = true }` maps the `<leader>a*` keys to the subcommands (20 keys; `<leader>as` in Visual mode). A key that is already mapped is left alone, with a notice when `notify = true`. Nothing is mapped by default.
+
+### Removed
+
+- The `:ClaudeCode`, `:ClaudeCodeStart`, `:ClaudeCodeStop`, `:ClaudeCodeStatus`, `:ClaudeCodeSend`, `:ClaudeCodeTreeAdd`, `:ClaudeCodeAdd`, `:ClaudeCodeFocus`, `:ClaudeCodeOpen`, `:ClaudeCodeClose`, `:ClaudeCodeSendText`, `:ClaudeCodeDiffAccept`, `:ClaudeCodeDiffDeny`, `:ClaudeCodeCloseAllDiffs` and `:ClaudeCodeSelectModel` commands. Use the `:Claudinho` subcommands.
+- The `native`, `external` and `none` terminal providers and custom table providers: Claude always runs in a Neovim terminal, in the Claude window. The extra arguments for `claude` in the old commands (`:ClaudeCode --resume`) are gone too.
+- `require("claudinho").start()`, `.stop()`, `.default_queue()` and `.process_mention_queue()`, the `ClaudinhoShutdown` autocmd and the plugin-wide server state (`state.server`, `state.port`, `state.auth_token`).
+
 ## [0.1.0] - 2026-11-15
 
 ### Changed

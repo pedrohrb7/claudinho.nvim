@@ -1335,12 +1335,7 @@ function M.send_at_mention_for_visual_selection(line1, line2)
     return false
   end
 
-  -- Check if Claude Code integration is running (server may or may not have clients)
   local claudinho_main = require("claudinho")
-  if not claudinho_main.state.server then
-    logger.error("selection", "Claude Code integration is not running.")
-    return false
-  end
 
   local sel_to_send
 
@@ -1392,7 +1387,7 @@ function M.send_at_mention_for_visual_selection(line1, line2)
     end_line = end_line - 1
   end
 
-  local success, error_msg = claudinho_main.send_at_mention(file_path, start_line, end_line, "ClaudeCodeSend")
+  local success, error_msg = claudinho_main.send_at_mention(file_path, start_line, end_line, "Claudinho send")
 
   if success then
     logger.debug("selection", "Visual selection sent as at-mention.")

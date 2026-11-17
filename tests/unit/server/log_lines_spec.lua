@@ -181,15 +181,27 @@ describe("Server lines on the command line", function()
       end
       return handle
     end
+    package.loaded["claudinho.sessions"] = nil
+    package.loaded["claudinho.session"] = nil
+    package.loaded["claudinho.notify"] = nil
     local claudinho = require("claudinho")
-    claudinho.setup({ auto_start = false, port_range = { min = 10000, max = 10000 } })
+    claudinho.state.config = vim.tbl_deep_extend("force", vim.deepcopy(require("claudinho.config").defaults), {
+      port_range = { min = 10000, max = 10000 },
+    })
+    vim.fn.executable = function()
+      return 1
+    end
     lines = {}
 
-    assert.is_false(claudinho.start(false))
+    -- The first tab is what starts a server now. Its start fails, and the error is the only line.
+    local tab = require("claudinho.sessions").new()
 
+    assert.is_nil(tab)
     local line = only_line()
     assert.equals(vim.log.levels.ERROR, line.level)
-    assert.equals("[Claudinho] [init] [ERROR] No free port in 10000-10000 (EADDRINUSE)", line.text)
+    -- The text comes from the session now, through notify.error: the module tag is gone, and the line is the reason
+    -- (the server's own "No free port ..." text) after the tab's label.
+    assert.equals("Could not start Claude 1: No free port in 10000-10000 (EADDRINUSE)", line.text)
   end)
 
   -- Without colors (a notify plugin, or :messages read through execute()), only the text tells an error from info.

@@ -2113,7 +2113,7 @@ end
 ---its accepted files. A saved diff that belongs to another client stays open:
 ---that client has not written it yet. Automatic cleanup deliberately uses
 ---close_pending_diffs / close_diffs_for_client instead, to leave already-saved
----diffs alone -- see close_pending_diffs for why. :ClaudeCodeCloseAllDiffs
+---diffs alone -- see close_pending_diffs for why. :Claudinho close-all-diffs
 ---closes saved diffs only through close_saved_diffs.
 ---@param reason string Human-readable reason (for logging)
 ---@param client_id string|nil The Claude client that called closeAllDiffTabs

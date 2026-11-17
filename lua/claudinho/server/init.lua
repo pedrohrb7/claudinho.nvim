@@ -107,17 +107,9 @@ function Server:start(config, auth_token)
         logger.debug("server", "Authenticated WebSocket client connected:", client.id)
       end
 
+      -- The client completed its WebSocket handshake, so the owner (a tab) can flush its queued @ mentions.
       if self.on_open then
         self.on_open(client)
-        return
-      end
-
-      -- The client completed its WebSocket handshake, so it can take the queued @ mentions now.
-      local main_module = require("claudinho")
-      if main_module.default_queue then
-        vim.schedule(function()
-          main_module.default_queue():on_open()
-        end)
       end
     end,
     on_disconnect = function(client, code, reason)

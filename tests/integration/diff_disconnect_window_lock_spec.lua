@@ -13,11 +13,11 @@ if vim == nil or vim.fn.has("nvim") ~= 1 then
 end
 
 describe("a Claude client that disconnects while Neovim refuses window changes", function()
-  local claudinho = require("claudinho")
+  local server_module = require("claudinho.server.init")
   local diff = require("claudinho.diff")
   local frame = require("claudinho.server.frame")
   local uv = vim.uv or vim.loop
-  local config_dir, real_config_dir, dir, client, inbox
+  local dir, client, inbox, auth_token
 
   local function wait_for(what, condition)
     assert(vim.wait(5000, condition, 10), what)
@@ -97,20 +97,22 @@ describe("a Claude client that disconnects while Neovim refuses window changes",
   end
 
   before_each(function()
-    real_config_dir = vim.env.CLAUDE_CONFIG_DIR
-    config_dir = vim.fn.tempname()
-    vim.fn.mkdir(config_dir, "p")
-    vim.env.CLAUDE_CONFIG_DIR = config_dir
     dir = vim.fn.tempname()
     vim.fn.mkdir(dir, "p")
     for _, name in ipairs({ "a.txt", "b.txt" }) do
       vim.fn.writefile({ "old " .. name }, dir .. "/" .. name)
     end
-    claudinho.setup({ auto_start = false, log_level = "error", terminal = { provider = "none" } })
-    assert.is_true(claudinho.start(false))
+    -- The server of one tab, started by hand: no tab, no process and no lock file are needed for what this checks.
+    local config = vim.tbl_deep_extend("force", vim.deepcopy(require("claudinho.config").defaults), {
+      log_level = "error",
+    })
+    require("claudinho.logger").setup(config)
+    diff.setup(config)
+    auth_token = require("claudinho.lockfile").generate_auth_token()
+    assert.is_true((server_module.start(config, auth_token)))
     inbox = ""
     client = uv.new_tcp()
-    client:connect("127.0.0.1", claudinho.state.port, function(err)
+    client:connect("127.0.0.1", server_module.state.port, function(err)
       assert(not err, err)
       client:read_start(function(_, data)
         inbox = inbox .. (data or "")
@@ -122,7 +124,7 @@ describe("a Claude client that disconnects while Neovim refuses window changes",
         "Connection: Upgrade",
         "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==",
         "Sec-WebSocket-Version: 13",
-        "x-claude-code-ide-authorization: " .. claudinho.state.auth_token,
+        "x-claude-code-ide-authorization: " .. auth_token,
         "",
         "",
       }, "\r\n"))
@@ -137,14 +139,12 @@ describe("a Claude client that disconnects while Neovim refuses window changes",
     if client and not client:is_closing() then
       client:close()
     end
-    pcall(claudinho.stop)
+    pcall(server_module.stop)
     diff._cleanup_all_active_diffs("test cleanup")
-    vim.env.CLAUDE_CONFIG_DIR = real_config_dir
     vim.cmd("silent! tabonly!")
     vim.cmd("silent! only!")
     vim.cmd("silent! %bwipeout!")
     vim.fn.delete(dir, "rf")
-    vim.fn.delete(config_dir, "rf")
     _G.claude_deferred_responses = nil
   end)
 

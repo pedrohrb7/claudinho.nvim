@@ -1,8 +1,7 @@
 require("tests.busted_setup")
 require("tests.mocks.vim")
 
-describe("ClaudeCodeSend Command Range Functionality", function()
-  local claudinho
+describe("Claudinho send Command Range Functionality", function()
   local mock_selection_module
   local mock_server
   local mock_terminal
@@ -12,6 +11,7 @@ describe("ClaudeCodeSend Command Range Functionality", function()
   before_each(function()
     -- Reset package cache
     package.loaded["claudinho"] = nil
+    package.loaded["claudinho.commands"] = nil
     package.loaded["claudinho.selection"] = nil
     package.loaded["claudinho.terminal"] = nil
     package.loaded["claudinho.server.init"] = nil
@@ -24,8 +24,11 @@ describe("ClaudeCodeSend Command Range Functionality", function()
     _G.vim = {
       api = {
         nvim_create_user_command = spy.new(function(name, callback, opts)
-          if name == "ClaudeCodeSend" then
-            command_callback = callback
+          if name == "Claudinho" then
+            command_callback = function(command_opts)
+              command_opts.fargs = { "send" }
+              return callback(command_opts)
+            end
           end
         end),
         nvim_create_augroup = spy.new(function()
@@ -141,13 +144,8 @@ describe("ClaudeCodeSend Command Range Functionality", function()
       end
     end
 
-    -- Load and setup claudinho
-    claudinho = require("claudinho")
-    claudinho.setup({})
-
-    -- Manually set server state for testing
-    claudinho.state.server = mock_server
-    claudinho.state.port = 12345
+    -- Create the command, as setup does
+    require("claudinho.commands").setup({})
   end)
 
   after_each(function()
@@ -155,22 +153,22 @@ describe("ClaudeCodeSend Command Range Functionality", function()
     _G.require = original_require
   end)
 
-  describe("ClaudeCodeSend command", function()
+  describe("Claudinho send command", function()
     it("should be registered with range support", function()
       assert.spy(_G.vim.api.nvim_create_user_command).was_called()
 
-      -- Find the ClaudeCodeSend command call
+      -- Find the Claudinho command call
       local calls = _G.vim.api.nvim_create_user_command.calls
-      local claudinho_send_call = nil
+      local claudinho_call = nil
       for _, call in ipairs(calls) do
-        if call.vals[1] == "ClaudeCodeSend" then
-          claudinho_send_call = call
+        if call.vals[1] == "Claudinho" then
+          claudinho_call = call
           break
         end
       end
 
-      assert(claudinho_send_call ~= nil, "ClaudeCodeSend command should be registered")
-      assert(claudinho_send_call.vals[3].range == true, "ClaudeCodeSend should support ranges")
+      assert(claudinho_call ~= nil, "Claudinho command should be registered")
+      assert(claudinho_call.vals[3].range == true, "Claudinho should support ranges")
     end)
 
     it("should pass range information to selection module when range is provided", function()
@@ -236,11 +234,8 @@ describe("ClaudeCodeSend Command Range Functionality", function()
       assert.spy(mock_terminal.open).was_not_called()
     end)
 
-    it("should handle server not running", function()
+    it("should hand the send to the selection module even when no tab is open", function()
       assert(command_callback ~= nil, "Command callback should be set")
-
-      -- Simulate server not running
-      claudinho.state.server = nil
 
       local opts = {
         range = 2,
@@ -250,7 +245,7 @@ describe("ClaudeCodeSend Command Range Functionality", function()
 
       command_callback(opts)
 
-      -- The command should call the selection module, which will handle the error
+      -- The command should call the selection module, which starts the first tab when it sends
       assert.spy(mock_selection_module.send_at_mention_for_visual_selection).was_called()
     end)
 

@@ -1,772 +1,486 @@
+--- The plugin module: what `setup` does (and does not: no server, no lock file, no process), the @-mention send to the
+--- active tab, and the model choice. The tab registry, the commands, the selection, the terminal facade and the diff
+--- module are fakes that record what `init` asks of them.
 require("tests.busted_setup")
-require("tests.mocks.vim")
 
 describe("claudinho.init", function()
-  ---@class AutocmdOptions
-  ---@field group string|number|nil
-  ---@field pattern string|string[]|nil
-  ---@field buffer number|nil
-  ---@field desc string|nil
-  ---@field callback function|nil
-  ---@field once boolean|nil
-  ---@field nested boolean|nil
-
-  local saved_vim_api = vim.api
-  local saved_vim_deepcopy = vim.deepcopy
-  local saved_vim_tbl_deep_extend = vim.tbl_deep_extend
-  local saved_vim_notify = vim.notify
-  local saved_vim_fn = vim.fn
-  local saved_vim_log = vim.log
-  local saved_require = _G.require
-  local augroup_ids
-
-  local mock_server = {
-    start = function()
-      return true, 12345
-    end,
-    ---@type SpyableFunction
-    stop = function()
-      return true
-    end,
+  local claudinho
+  local loaded_names = {
+    "claudinho",
+    "claudinho.conflict",
+    "claudinho.sessions",
+    "claudinho.commands",
+    "claudinho.selection",
+    "claudinho.terminal",
+    "claudinho.diff",
+    "claudinho.server.init",
+    "claudinho.lockfile",
+    "claudinho.notify",
   }
+  local saved_loaded, restore_list
+  local log, state
 
-  local mock_lockfile = {
-    create = function()
-      return true, "/mock/path", "mock-auth-token-12345"
-    end,
-    ---@type SpyableFunction
-    remove = function()
-      return true
-    end,
-    generate_auth_token = function()
-      return "mock-auth-token-12345"
-    end,
-  }
-
-  local mock_selection = {
-    enable = function() end,
-    disable = function() end,
-  }
-
-  local SpyObject = {}
-  function SpyObject.new(fn)
-    local spy_obj = {
-      _original = fn,
-      calls = {},
-    }
-
-    function spy_obj.spy()
-      return {
-        was_called = function(n)
-          assert(#spy_obj.calls == n, "Expected " .. n .. " calls, got " .. #spy_obj.calls)
-          return true
-        end,
-        was_not_called = function()
-          assert(#spy_obj.calls == 0, "Expected 0 calls, got " .. #spy_obj.calls)
-          return true
-        end,
-        was_called_with = function(...)
-          -- args is unused but keeping the parameter for clarity, as the function signature might be relevant for future tests
-          assert(#spy_obj.calls > 0, "Function was never called")
-          return true
-        end,
-      }
-    end
-
-    return setmetatable(spy_obj, {
-      __call = function(self, ...)
-        table.insert(self.calls, { vals = { ... } })
-        if self._original then
-          return self._original(...)
-        end
-      end,
-    })
+  ---Replace tbl[key] until after_each.
+  local function stub(tbl, key, value)
+    table.insert(restore_list, { tbl, key, tbl[key] })
+    tbl[key] = value
   end
 
-  local match = {
-    is_table = function()
-      return { is_table = true }
-    end,
-  }
-
-  -- The VimLeavePre callback init.lua registers in its ClaudinhoShutdown group. setup() can load
-  -- claudinho.diff for the first time, and that module registers a VimLeavePre autocmd of its own.
-  local function find_shutdown_callback()
-    for _, call in ipairs(vim.api.nvim_create_autocmd.calls) do
-      local opts = call.vals[2]
-      if call.vals[1] == "VimLeavePre" and opts and opts.group == augroup_ids.ClaudinhoShutdown then
-        return opts.callback
+  ---@param name string
+  ---@return integer How many times the log has the entry
+  local function count(name)
+    local total = 0
+    for _, entry in ipairs(log) do
+      if entry == name then
+        total = total + 1
       end
     end
+    return total
   end
 
-  -- The text of every WARN that logger.warn passed to vim.notify since the spy was last cleared.
-  local function warn_messages()
-    local messages = {}
-    for _, call in ipairs(vim.notify.calls) do
-      if call.vals[2] == vim.log.levels.WARN then
-        table.insert(messages, call.vals[1])
-      end
+  ---A fake mention queue of one tab.
+  local function new_queue()
+    local queue = { enqueued = {}, sent = {}, connected = false, send_result = { true, nil, nil } }
+    function queue:is_connected()
+      return self.connected
     end
-    return messages
+    function queue:enqueue(file_path, start_line, end_line)
+      table.insert(self.enqueued, { file_path, start_line, end_line })
+      if self.format_error then
+        return nil, self.format_error
+      end
+      return { file_path = file_path }
+    end
+    function queue:send(file_path, start_line, end_line)
+      table.insert(self.sent, { file_path, start_line, end_line })
+      return unpack(self.send_result)
+    end
+    return queue
+  end
+
+  ---A fake tab.
+  local function new_tab(number, tab_state)
+    return { number = number, state = tab_state or "running", queue = new_queue() }
   end
 
   before_each(function()
-    -- A fresh module, so a server an earlier test started is not still running.
-    package.loaded["claudinho"] = nil
-    augroup_ids = {}
-    local augroup_count = 0
-    vim.api = {
-      nvim_create_autocmd = SpyObject.new(function() end),
-      -- One id per group name, so tests can tell the groups apart.
-      nvim_create_augroup = SpyObject.new(function(name)
-        if not augroup_ids[name] then
-          augroup_count = augroup_count + 1
-          augroup_ids[name] = augroup_count
+    saved_loaded, restore_list = {}, {}
+    for _, name in ipairs(loaded_names) do
+      saved_loaded[name] = package.loaded[name]
+      package.loaded[name] = nil
+    end
+    log = {}
+    state = { active = nil, new_error = nil, notices = {}, autocmds = {}, selects = {} }
+
+    package.loaded["claudinho.conflict"] = {
+      check = function()
+        return state.conflict == true
+      end,
+    }
+    package.loaded["claudinho.notify"] = {
+      info = function(msg)
+        table.insert(state.notices, { "info", msg })
+      end,
+      reply = function(msg)
+        table.insert(state.notices, { "reply", msg })
+      end,
+      error = function(msg)
+        table.insert(state.notices, { "error", msg })
+      end,
+    }
+    local router = { broadcast = function() end }
+    package.loaded["claudinho.sessions"] = {
+      NO_TABS = "No Claude tabs open",
+      router = router,
+      active = function()
+        return state.active
+      end,
+      new = function(extra_args)
+        table.insert(log, "sessions.new" .. (extra_args or ""))
+        if state.new_error then
+          return nil, state.new_error
         end
-        return augroup_ids[name]
-      end),
-      nvim_create_user_command = SpyObject.new(function() end),
-      nvim_echo = SpyObject.new(function() end),
+        state.active = new_tab(1)
+        return state.active
+      end,
+      setup_autocmds = function()
+        table.insert(log, "sessions.setup_autocmds")
+      end,
+      exited_message = function(s)
+        return ("Claude %d has exited; run :Claudinho tab-restart %d"):format(s.number, s.number)
+      end,
     }
-
-    vim.deepcopy = function(t)
-      return t
-    end
-
-    vim.tbl_deep_extend = function(_, default, override)
-      local result = {}
-      for k, v in pairs(default) do
-        result[k] = v
-      end
-      for k, v in pairs(override) do
-        result[k] = v
-      end
-      return result
-    end
-
-    vim.notify = spy.new(function() end)
-
-    vim.fn = { ---@type vim_fn_table
-      getpid = function()
-        return 123
+    package.loaded["claudinho.commands"] = {
+      setup = function(config)
+        table.insert(log, "commands.setup")
+        state.commands_config = config
       end,
-      expand = function()
-        return "/mock/path"
+    }
+    package.loaded["claudinho.selection"] = {
+      enable = function(target, delay)
+        table.insert(log, "selection.enable")
+        state.selection_target, state.selection_delay = target, delay
       end,
-      mode = function()
-        return "n"
+    }
+    package.loaded["claudinho.terminal"] = {
+      setup = function(term_config)
+        table.insert(log, "terminal.setup")
+        state.terminal_config = term_config
       end,
-      delete = function(_, _)
-        return 0
+      open = function()
+        table.insert(log, "terminal.open")
       end,
-      filereadable = function(_)
-        return 1
+      ensure_visible = function()
+        table.insert(log, "terminal.ensure_visible")
       end,
-      fnamemodify = function(fname, _)
-        return fname
-      end,
-      getcwd = function()
-        return "/mock/cwd"
-      end,
-      mkdir = function(_, _, _)
-        return 1
-      end,
-      buflisted = function(_)
-        return 1
-      end,
-      bufname = function(_)
-        return "mockbuffer"
-      end,
-      bufnr = function(_)
-        return 1
-      end,
-      win_getid = function()
-        return 1
-      end,
-      win_gotoid = function(_)
+      send_to_terminal = function(text)
+        table.insert(log, "terminal.send_to_terminal " .. text)
         return true
       end,
-      line = function(_)
-        return 1
-      end,
-      col = function(_)
-        return 1
-      end,
-      virtcol = function(_)
-        return 1
-      end,
-      getpos = function(_)
-        return { 0, 1, 1, 0 }
-      end,
-      setpos = function(_, _)
-        return true
-      end,
-      tempname = function()
-        return "/tmp/mocktemp"
-      end,
-      globpath = function(_, _)
-        return ""
-      end,
-      stdpath = function(_)
-        return "/mock/stdpath"
-      end,
-      json_encode = function(_)
-        return "{}"
-      end,
-      json_decode = function(_)
-        return {}
-      end,
-      termopen = function(_, _)
-        return 0
+    }
+    package.loaded["claudinho.diff"] = {
+      setup = function()
+        table.insert(log, "diff.setup")
       end,
     }
+    -- Nothing in `setup` may start a server or write a lock file (rule 2).
+    package.loaded["claudinho.server.init"] = setmetatable({}, {
+      __index = function(_, key)
+        error("init touched the server module: " .. tostring(key))
+      end,
+    })
+    package.loaded["claudinho.lockfile"] = setmetatable({}, {
+      __index = function(_, key)
+        error("init touched the lock file module: " .. tostring(key))
+      end,
+    })
 
-    vim.log = {
-      levels = {
-        NONE = 0,
-        INFO = 2,
-        WARN = 3,
-        ERROR = 4,
-        DEBUG = 5,
-        TRACE = 6,
-      },
-    }
+    stub(vim.fn, "shellescape", function(value)
+      return "'" .. value .. "'"
+    end)
+    stub(vim, "ui", {
+      select = function(items, opts, on_choice)
+        table.insert(state.selects, { items = items, opts = opts })
+        state.on_choice = on_choice
+      end,
+    })
 
-    mock_server.stop = SpyObject.new(mock_server.stop)
-    mock_lockfile.remove = SpyObject.new(mock_lockfile.remove)
-
-    _G.require = function(mod)
-      if mod == "claudinho.server.init" then
-        return mock_server
-      elseif mod == "claudinho.lockfile" then
-        return mock_lockfile
-      elseif mod == "claudinho.selection" then
-        return mock_selection
-      else
-        return saved_require(mod)
-      end
-    end
-
-    _G.match = match
+    claudinho = require("claudinho")
   end)
 
   after_each(function()
-    vim.api = saved_vim_api
-    vim.deepcopy = saved_vim_deepcopy
-    vim.tbl_deep_extend = saved_vim_tbl_deep_extend
-    vim.notify = saved_vim_notify
-    vim.fn = saved_vim_fn
-    vim.log = saved_vim_log
-    _G.require = saved_require
+    for i = #restore_list, 1, -1 do
+      local entry = restore_list[i]
+      entry[1][entry[2]] = entry[3]
+    end
+    for _, name in ipairs(loaded_names) do
+      package.loaded[name] = saved_loaded[name]
+    end
   end)
 
   describe("setup", function()
-    it("should register VimLeavePre autocmd for auto-shutdown", function()
-      local claudinho = require("claudinho")
+    it("sets up the terminal facade, the diff, the selection, the tabs and the commands, in that order", function()
       claudinho.setup()
 
-      assert(#vim.api.nvim_create_augroup.calls > 0, "nvim_create_augroup was not called")
-      assert(#vim.api.nvim_create_autocmd.calls > 0, "nvim_create_autocmd was not called")
-
-      assert(vim.api.nvim_create_autocmd.calls[1].vals[1] == "VimLeavePre", "Expected VimLeavePre event")
+      assert.are.same({
+        "terminal.setup",
+        "diff.setup",
+        "selection.enable",
+        "sessions.setup_autocmds",
+        "commands.setup",
+      }, log)
+      assert.is_true(claudinho.state.initialized)
     end)
-  end)
 
-  describe("auto-shutdown", function()
-    it("should stop the server and remove lockfile when Neovim exits", function()
-      local claudinho = require("claudinho")
+    it("starts no server and writes no lock file", function()
+      -- The fakes of both modules raise on any access.
+      assert.has_no.errors(function()
+        claudinho.setup()
+      end)
+    end)
+
+    it("points the selection at the router of the tabs, with the demotion delay of the configuration", function()
+      claudinho.setup({ visual_demotion_delay_ms = 123 })
+
+      assert.are.equal(package.loaded["claudinho.sessions"].router, state.selection_target)
+      assert.are.equal(123, state.selection_delay)
+    end)
+
+    it("does not enable the selection with track_selection = false", function()
+      claudinho.setup({ track_selection = false })
+
+      assert.is_nil(state.selection_target)
+      assert.are.equal(0, count("selection.enable"))
+    end)
+
+    it("gives the terminal facade the terminal table and the commands the whole configuration", function()
+      claudinho.setup({ keymaps = { preset = true } })
+
+      assert.are.equal(claudinho.state.config.terminal, state.terminal_config)
+      assert.are.equal(claudinho.state.config, state.commands_config)
+      assert.is_true(state.commands_config.keymaps.preset)
+    end)
+
+    it("does nothing when claudecode.nvim is loaded", function()
+      state.conflict = true
+
+      local returned = claudinho.setup()
+
+      assert.are.equal(claudinho, returned)
+      assert.are.same({}, log)
+      assert.is_false(claudinho.state.initialized)
+    end)
+
+    it("can run twice", function()
       claudinho.setup()
-      claudinho.start()
+      claudinho.setup()
 
-      local callback_fn = find_shutdown_callback()
-      assert(callback_fn, "Callback for VimLeavePre with ClaudinhoShutdown group not found")
-
-      mock_server.stop.calls = {}
-      mock_lockfile.remove.calls = {}
-
-      if callback_fn then
-        callback_fn()
-      end
-
-      assert(#mock_server.stop.calls > 0, "Server stop was not called")
-      assert(#mock_lockfile.remove.calls > 0, "Lockfile remove was not called")
-    end)
-
-    it("should do nothing if the server is not running", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
-
-      local callback_fn = find_shutdown_callback()
-      assert(callback_fn, "Callback for VimLeavePre with ClaudinhoShutdown group not found")
-
-      mock_server.stop.calls = {}
-      mock_lockfile.remove.calls = {}
-
-      if callback_fn then
-        callback_fn()
-      end
-
-      assert(#mock_server.stop.calls == 0, "Server stop was called unexpectedly")
-      assert(#mock_lockfile.remove.calls == 0, "Lockfile remove was called unexpectedly")
+      assert.are.equal(2, count("commands.setup"))
+      assert.is_true(claudinho.state.initialized)
     end)
   end)
 
-  describe("start with a lock file whose token does not match", function()
-    local real_create
-    local real_remove
-    local real_stop
-    local order
+  describe("the API that left", function()
+    it("has no start, stop, queue of its own or command creation", function()
+      for _, name in ipairs({
+        "start",
+        "stop",
+        "default_queue",
+        "process_mention_queue",
+        "_create_commands",
+        "_maybe_warn_unfocusable_provider",
+        "_ensure_terminal_visible_if_connected",
+      }) do
+        assert.is_nil(claudinho[name], name)
+      end
+    end)
+
+    it("keeps no server in its state", function()
+      assert.is_nil(claudinho.state.server)
+      assert.is_nil(claudinho.state.port)
+      assert.is_nil(claudinho.state.auth_token)
+    end)
+  end)
+
+  describe("is_claude_connected", function()
+    it("is false without tabs", function()
+      assert.is_false(claudinho.is_claude_connected())
+    end)
+
+    it("follows the queue of the active tab", function()
+      state.active = new_tab(1)
+      assert.is_false(claudinho.is_claude_connected())
+
+      state.active.queue.connected = true
+      assert.is_true(claudinho.is_claude_connected())
+    end)
+
+    it("is false when the active tab has exited", function()
+      state.active = new_tab(2, "exited")
+      state.active.queue.connected = true
+
+      assert.is_false(claudinho.is_claude_connected())
+    end)
+  end)
+
+  describe("send_at_mention", function()
+    local fired
 
     before_each(function()
-      real_create = mock_lockfile.create
-      real_remove = mock_lockfile.remove
-      real_stop = mock_server.stop
-      order = {}
-      -- The generated token is "mock-auth-token-12345". create wrote a file that holds another one.
-      mock_lockfile.create = function()
-        return true, "/mock/path/12345.lock", "some-other-token-99999"
-      end
-      -- Both spies also record the order of the two calls.
-      mock_lockfile.remove = SpyObject.new(function()
-        table.insert(order, "lockfile.remove")
-        return true
+      fired = {}
+      stub(vim.api, "nvim_exec_autocmds", function(event, opts)
+        table.insert(fired, { event = event, opts = opts })
       end)
-      mock_server.stop = SpyObject.new(function()
-        table.insert(order, "server.stop")
-        return true
-      end)
+      claudinho.state.config = { focus_after_send = false }
     end)
 
-    after_each(function()
-      mock_lockfile.create = real_create
-      mock_lockfile.remove = real_remove
-      mock_server.stop = real_stop
+    it("starts the first tab without tabs and queues the mention there", function()
+      local ok, err = claudinho.send_at_mention("/work/a.lua", 1, 2, "test")
+
+      assert.is_true(ok)
+      assert.is_nil(err)
+      assert.are.same({ "sessions.new" }, log)
+      assert.are.same({ { "/work/a.lua", 1, 2 } }, state.active.queue.enqueued)
+      assert.are.same({}, state.active.queue.sent)
     end)
 
-    it("should stop the server and remove the lock file that create wrote", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
-      mock_server.stop.calls = {}
-      mock_lockfile.remove.calls = {}
+    it("returns the error of a tab that could not start", function()
+      state.new_error = "Could not start Claude 1: nope"
 
-      local success, err = claudinho.start(false)
+      local ok, err = claudinho.send_at_mention("/work/a.lua")
 
-      assert(success == false)
-      assert(err == "Authentication token mismatch between server and lock file", tostring(err))
-      assert(#mock_server.stop.calls == 1, "Server stop was not called once")
-      assert(#mock_lockfile.remove.calls == 1, "Lock file was not removed")
-      assert(mock_lockfile.remove.calls[1].vals[1] == 12345, "Lock file removed for the wrong port")
-      assert(claudinho.state.server == nil)
-      assert(claudinho.state.port == nil)
-      assert(claudinho.state.auth_token == nil)
+      assert.is_false(ok)
+      assert.are.equal("Could not start Claude 1: nope", err)
     end)
 
-    it("should remove the lock file before it stops the server", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
-      order = {}
+    it("returns the format error of a path the queue cannot take", function()
+      local ok, err
 
-      claudinho.start(false)
-
-      assert(table.concat(order, ",") == "lockfile.remove,server.stop", table.concat(order, ","))
-    end)
-
-    it("should still fail with the mismatch error when the lock file cannot be removed", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
-      mock_server.stop.calls = {}
-      local remove_calls = 0
-      mock_lockfile.remove = function()
-        remove_calls = remove_calls + 1
-        return false, "Failed to remove lock file: /mock/path/12345.lock: Permission denied"
+      -- The tab starts first, with a queue that refuses the path.
+      local sessions = package.loaded["claudinho.sessions"]
+      local original_new = sessions.new
+      sessions.new = function(...)
+        local s = original_new(...)
+        s.queue.format_error = "path does not exist"
+        return s
       end
-      vim.notify:clear()
+      ok, err = claudinho.send_at_mention("/work/missing.lua")
 
-      local success, err = claudinho.start(false)
-
-      assert(success == false)
-      assert(err == "Authentication token mismatch between server and lock file", tostring(err))
-      assert(remove_calls == 1, "Lock file removal was not tried once")
-      assert(#mock_server.stop.calls == 1, "Server stop was not called once")
-      assert(claudinho.state.server == nil)
-
-      -- One warning carries the OS error. It names the failed removal once, not twice.
-      local warnings = warn_messages()
-      assert(#warnings == 1, "Expected one warning, got " .. #warnings)
-      assert(
-        warnings[1] == "[Claudinho] [init] [WARN] Failed to remove lock file: /mock/path/12345.lock: Permission denied",
-        warnings[1]
-      )
+      assert.is_false(ok)
+      assert.are.equal("path does not exist", err)
     end)
 
-    it("should not warn when the lock file is removed", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
-      vim.notify:clear()
+    it("sends at once to a connected tab, keeps the window visible and fires ClaudinhoSendComplete", function()
+      state.active = new_tab(1)
+      state.active.queue.connected = true
+      state.active.queue.send_result = { true, nil, { file_path = "/work/a.lua", start_line = 3, end_line = 4 } }
 
-      claudinho.start(false)
+      local ok = claudinho.send_at_mention("/work/a.lua", 3, 4, "ctx")
 
-      assert(#warn_messages() == 0, "Unexpected warning: " .. tostring(warn_messages()[1]))
+      assert.is_true(ok)
+      assert.are.same({ { "/work/a.lua", 3, 4 } }, state.active.queue.sent)
+      assert.are.same({ "terminal.ensure_visible" }, log)
+      assert.are.equal("User", fired[1].event)
+      assert.are.equal("ClaudinhoSendComplete", fired[1].opts.pattern)
+      assert.are.same({ file_path = "/work/a.lua", start_line = 3, end_line = 4, context = "ctx" }, fired[1].opts.data)
+    end)
+
+    it("focuses the terminal after a send with focus_after_send", function()
+      claudinho.state.config = { focus_after_send = true }
+      state.active = new_tab(1)
+      state.active.queue.connected = true
+
+      claudinho.send_at_mention("/work/a.lua")
+
+      assert.are.same({ "terminal.open" }, log)
+    end)
+
+    it("fires nothing when the queue refuses the send", function()
+      state.active = new_tab(1)
+      state.active.queue.connected = true
+      state.active.queue.send_result = { false, "refused", nil }
+
+      local ok, err = claudinho.send_at_mention("/work/a.lua")
+
+      assert.is_false(ok)
+      assert.are.equal("refused", err)
+      assert.are.same({}, fired)
+      assert.are.same({}, log)
+    end)
+
+    it("queues for a tab that has not connected yet and shows the window", function()
+      state.active = new_tab(1)
+
+      local ok = claudinho.send_at_mention("/work/a.lua", nil, nil, "test")
+
+      assert.is_true(ok)
+      assert.are.same({ { "/work/a.lua" } }, state.active.queue.enqueued)
+      assert.are.same({}, state.active.queue.sent)
+      assert.are.same({ "terminal.open" }, log)
+      assert.are.same({}, fired)
+    end)
+
+    it("sends nothing to a tab that has exited and says how to bring it back", function()
+      state.active = new_tab(2, "exited")
+
+      local ok, err = claudinho.send_at_mention("/work/a.lua")
+
+      assert.is_false(ok)
+      assert.are.equal("Claude 2 has exited; run :Claudinho tab-restart 2", err)
+      assert.are.same({}, state.active.queue.enqueued)
+      assert.are.same({}, state.active.queue.sent)
     end)
   end)
 
-  describe("stop when the lock file cannot be removed", function()
-    local real_remove
+  describe("_broadcast_at_mention", function()
+    it("answers without tabs", function()
+      local ok, err = claudinho._broadcast_at_mention("/work/a.lua")
 
-    before_each(function()
-      real_remove = mock_lockfile.remove
+      assert.is_false(ok)
+      assert.are.equal("No Claude tabs open", err)
     end)
 
-    after_each(function()
-      mock_lockfile.remove = real_remove
+    it("sends through the queue of the active tab", function()
+      state.active = new_tab(1)
+
+      assert.is_true(claudinho._broadcast_at_mention("/work/a.lua", 0, 1))
+      assert.are.same({ { "/work/a.lua", 0, 1 } }, state.active.queue.sent)
     end)
 
-    it("should warn once with the lock file error and still stop the server", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
-      local started = claudinho.start(false)
-      assert(started == true)
-      mock_server.stop.calls = {}
-      mock_lockfile.remove = function()
-        return false, "Failed to remove lock file: /mock/path/12345.lock: Permission denied"
-      end
-      vim.notify:clear()
+    it("answers for a tab that has exited", function()
+      state.active = new_tab(3, "exited")
 
-      local success = claudinho.stop()
+      local ok, err = claudinho._broadcast_at_mention("/work/a.lua")
 
-      assert(success == true)
-      assert(#mock_server.stop.calls == 1, "Server stop was not called once")
-      assert(claudinho.state.server == nil)
-      local warnings = warn_messages()
-      assert(#warnings == 1, "Expected one warning, got " .. #warnings)
-      assert(
-        warnings[1] == "[Claudinho] [init] [WARN] Failed to remove lock file: /mock/path/12345.lock: Permission denied",
-        warnings[1]
-      )
+      assert.is_false(ok)
+      assert.are.equal("Claude 3 has exited; run :Claudinho tab-restart 3", err)
     end)
   end)
 
-  describe("ClaudeCode command with arguments", function()
-    local mock_terminal
-
+  describe("open_with_model", function()
     before_each(function()
-      mock_terminal = {
-        toggle = spy.new(function() end),
-        simple_toggle = spy.new(function() end),
-        focus_toggle = spy.new(function() end),
-        open = spy.new(function() end),
-        close = spy.new(function() end),
-        setup = spy.new(function() end),
-        ensure_visible = spy.new(function() end),
+      claudinho.state.config = {
+        models = { { name = "Opus", value = "opus" }, { name = "Opus 1M", value = "opus[1m]" } },
       }
-
-      local original_require = _G.require
-      _G.require = function(mod)
-        if mod == "claudinho.terminal" then
-          return mock_terminal
-        elseif mod == "claudinho.server.init" then
-          return mock_server
-        elseif mod == "claudinho.lockfile" then
-          return mock_lockfile
-        elseif mod == "claudinho.selection" then
-          return mock_selection
-        else
-          return original_require(mod)
-        end
-      end
     end)
 
-    it("should register ClaudeCode command with nargs='*'", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
+    it("starts the first tab with --model when there are no tabs", function()
+      claudinho.open_with_model()
+      state.on_choice(claudinho.state.config.models[2])
 
-      local command_found = false
-      for _, call in ipairs(vim.api.nvim_create_user_command.calls) do
-        if call.vals[1] == "ClaudeCode" then
-          command_found = true
-          local config = call.vals[3]
-          assert.is_equal("*", config.nargs)
-          assert.is_true(
-            string.find(config.desc, "optional arguments") ~= nil,
-            "Description should mention optional arguments"
-          )
-          break
-        end
-      end
-      assert.is_true(command_found, "ClaudeCode command was not registered")
+      assert.are.same({ "sessions.new --model 'opus[1m]'" }, log)
     end)
 
-    it("should register ClaudeCodeOpen command with nargs='*'", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
+    it("sends /model to the running active tab", function()
+      state.active = new_tab(1)
 
-      local command_found = false
-      for _, call in ipairs(vim.api.nvim_create_user_command.calls) do
-        if call.vals[1] == "ClaudeCodeOpen" then
-          command_found = true
-          local config = call.vals[3]
-          assert.is_equal("*", config.nargs)
-          assert.is_true(
-            string.find(config.desc, "optional arguments") ~= nil,
-            "Description should mention optional arguments"
-          )
-          break
-        end
-      end
-      assert.is_true(command_found, "ClaudeCodeOpen command was not registered")
+      claudinho.open_with_model()
+      state.on_choice(claudinho.state.config.models[1])
+
+      assert.are.same({ "terminal.send_to_terminal /model opus" }, log)
     end)
 
-    it("should parse and pass arguments to terminal.toggle for ClaudeCode command", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
+    it("replies and shows no choice when the active tab has exited", function()
+      state.active = new_tab(2, "exited")
 
-      -- Find and call the ClaudeCode command handler
-      local command_handler
-      for _, call in ipairs(vim.api.nvim_create_user_command.calls) do
-        if call.vals[1] == "ClaudeCode" then
-          command_handler = call.vals[2]
-          break
-        end
-      end
+      claudinho.open_with_model()
 
-      assert.is_function(command_handler, "Command handler should be a function")
-
-      command_handler({ args = "--resume --verbose" })
-
-      assert(#mock_terminal.simple_toggle.calls > 0, "terminal.simple_toggle was not called")
-      local call_args = mock_terminal.simple_toggle.calls[1].vals
-      assert.is_table(call_args[1], "First argument should be a table")
-      assert.is_equal("--resume --verbose", call_args[2], "Second argument should be the command args")
+      assert.are.same({}, state.selects)
+      assert.are.same({ { "reply", "Claude 2 has exited; run :Claudinho tab-restart 2" } }, state.notices)
     end)
 
-    it("should parse and pass arguments to terminal.open for ClaudeCodeOpen command", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
+    it("replies when the tab exits while the choice is open", function()
+      state.active = new_tab(1)
 
-      -- Find and call the ClaudeCodeOpen command handler
-      local command_handler
-      for _, call in ipairs(vim.api.nvim_create_user_command.calls) do
-        if call.vals[1] == "ClaudeCodeOpen" then
-          command_handler = call.vals[2]
-          break
-        end
-      end
+      claudinho.open_with_model()
+      state.active.state = "exited"
+      state.on_choice(claudinho.state.config.models[1])
 
-      assert.is_function(command_handler, "Command handler should be a function")
-
-      command_handler({ args = "--flag1 --flag2" })
-
-      assert(#mock_terminal.open.calls > 0, "terminal.open was not called")
-      local call_args = mock_terminal.open.calls[1].vals
-      assert.is_table(call_args[1], "First argument should be a table")
-      assert.is_equal("--flag1 --flag2", call_args[2], "Second argument should be the command args")
+      assert.are.same({}, log)
+      assert.are.same({ { "reply", "Claude 1 has exited; run :Claudinho tab-restart 1" } }, state.notices)
     end)
 
-    it("should handle empty arguments gracefully", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
+    it("does nothing when the choice is cancelled", function()
+      claudinho.open_with_model()
+      state.on_choice(nil)
 
-      local command_handler
-      for _, call in ipairs(vim.api.nvim_create_user_command.calls) do
-        if call.vals[1] == "ClaudeCode" then
-          command_handler = call.vals[2]
-          break
-        end
-      end
-
-      command_handler({ args = "" })
-
-      assert(#mock_terminal.simple_toggle.calls > 0, "terminal.simple_toggle was not called")
-      local call_args = mock_terminal.simple_toggle.calls[1].vals
-      assert.is_nil(call_args[2], "Second argument should be nil for empty args")
+      assert.are.same({}, log)
     end)
 
-    it("should handle nil arguments gracefully", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
+    it("lists the models by name", function()
+      claudinho.open_with_model()
 
-      local command_handler
-      for _, call in ipairs(vim.api.nvim_create_user_command.calls) do
-        if call.vals[1] == "ClaudeCode" then
-          command_handler = call.vals[2]
-          break
-        end
-      end
-
-      command_handler({ args = nil })
-
-      assert(#mock_terminal.simple_toggle.calls > 0, "terminal.simple_toggle was not called")
-      local call_args = mock_terminal.simple_toggle.calls[1].vals
-      assert.is_nil(call_args[2], "Second argument should be nil when args is nil")
-    end)
-
-    it("should maintain backward compatibility when no arguments provided", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
-
-      local command_handler
-      for _, call in ipairs(vim.api.nvim_create_user_command.calls) do
-        if call.vals[1] == "ClaudeCode" then
-          command_handler = call.vals[2]
-          break
-        end
-      end
-
-      command_handler({})
-
-      assert(#mock_terminal.simple_toggle.calls > 0, "terminal.simple_toggle was not called")
-      local call_args = mock_terminal.simple_toggle.calls[1].vals
-      assert.is_nil(call_args[2], "Second argument should be nil when no args provided")
+      assert.are.equal(claudinho.state.config.models, state.selects[1].items)
+      assert.are.equal("Opus 1M", state.selects[1].opts.format_item(claudinho.state.config.models[2]))
     end)
   end)
 
-  describe("ClaudeCodeSelectModel command with arguments", function()
-    local mock_terminal
-    local mock_ui_select
-    local mock_vim_cmd
+  describe("get_version", function()
+    it("describes the version", function()
+      local version = claudinho.get_version()
 
-    before_each(function()
-      mock_terminal = {
-        toggle = spy.new(function() end),
-        simple_toggle = spy.new(function() end),
-        focus_toggle = spy.new(function() end),
-        open = spy.new(function() end),
-        close = spy.new(function() end),
-      }
-
-      -- Mock vim.ui.select to automatically select the first model
-      mock_ui_select = spy.new(function(models, opts, callback)
-        -- Simulate user selecting the first model
-        callback(models[1])
-      end)
-
-      -- Mock vim.cmd to capture command execution
-      mock_vim_cmd = spy.new(function(cmd) end)
-
-      vim.ui = vim.ui or {}
-      vim.ui.select = mock_ui_select
-      vim.cmd = mock_vim_cmd
-
-      local original_require = _G.require
-      _G.require = function(mod)
-        if mod == "claudinho.terminal" then
-          return mock_terminal
-        elseif mod == "claudinho.server.init" then
-          return mock_server
-        elseif mod == "claudinho.lockfile" then
-          return mock_lockfile
-        elseif mod == "claudinho.selection" then
-          return mock_selection
-        else
-          return original_require(mod)
-        end
-      end
-    end)
-
-    it("should register ClaudeCodeSelectModel command with correct configuration", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
-
-      local command_found = false
-      for _, call in ipairs(vim.api.nvim_create_user_command.calls) do
-        if call.vals[1] == "ClaudeCodeSelectModel" then
-          command_found = true
-          local config = call.vals[3]
-          assert.is_equal("*", config.nargs)
-          assert.is_true(
-            string.find(config.desc, "model.*arguments") ~= nil,
-            "Description should mention model and arguments"
-          )
-          break
-        end
-      end
-      assert.is_true(command_found, "ClaudeCodeSelectModel command was not registered")
-    end)
-
-    it("should call ClaudeCode command with model arg when no additional args provided", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
-
-      -- Find and call the ClaudeCodeSelectModel command handler
-      local command_handler
-      for _, call in ipairs(vim.api.nvim_create_user_command.calls) do
-        if call.vals[1] == "ClaudeCodeSelectModel" then
-          command_handler = call.vals[2]
-          break
-        end
-      end
-
-      assert.is_function(command_handler, "Command handler should be a function")
-
-      command_handler({ args = "" })
-
-      -- Verify vim.ui.select was called
-      assert(#mock_ui_select.calls > 0, "vim.ui.select was not called")
-
-      -- Verify vim.cmd was called with the correct ClaudeCode command
-      assert(#mock_vim_cmd.calls > 0, "vim.cmd was not called")
-      local cmd_arg = mock_vim_cmd.calls[1].vals[1]
-      assert.is_equal("ClaudeCode --model opus", cmd_arg, "Should call ClaudeCode with model arg")
-    end)
-
-    it("should call ClaudeCode command with model and additional args", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
-
-      -- Find and call the ClaudeCodeSelectModel command handler
-      local command_handler
-      for _, call in ipairs(vim.api.nvim_create_user_command.calls) do
-        if call.vals[1] == "ClaudeCodeSelectModel" then
-          command_handler = call.vals[2]
-          break
-        end
-      end
-
-      assert.is_function(command_handler, "Command handler should be a function")
-
-      command_handler({ args = "--resume --verbose" })
-
-      -- Verify vim.ui.select was called
-      assert(#mock_ui_select.calls > 0, "vim.ui.select was not called")
-
-      -- Verify vim.cmd was called with the correct ClaudeCode command including additional args
-      assert(#mock_vim_cmd.calls > 0, "vim.cmd was not called")
-      local cmd_arg = mock_vim_cmd.calls[1].vals[1]
-      assert.is_equal(
-        "ClaudeCode --model opus --resume --verbose",
-        cmd_arg,
-        "Should call ClaudeCode with model and additional args"
-      )
-    end)
-
-    it("should handle user cancellation gracefully", function()
-      local claudinho = require("claudinho")
-      claudinho.setup({ auto_start = false })
-
-      -- Mock vim.ui.select to simulate user cancellation
-      vim.ui.select = spy.new(function(models, opts, callback)
-        callback(nil) -- User cancelled
-      end)
-
-      -- Find and call the ClaudeCodeSelectModel command handler
-      local command_handler
-      for _, call in ipairs(vim.api.nvim_create_user_command.calls) do
-        if call.vals[1] == "ClaudeCodeSelectModel" then
-          command_handler = call.vals[2]
-          break
-        end
-      end
-
-      assert.is_function(command_handler, "Command handler should be a function")
-
-      command_handler({ args = "--resume" })
-
-      -- Verify vim.ui.select was called
-      assert(#vim.ui.select.calls > 0, "vim.ui.select was not called")
-
-      -- Verify vim.cmd was NOT called due to user cancellation
-      assert.is_equal(0, #mock_vim_cmd.calls, "vim.cmd should not be called when user cancels")
+      assert.are.equal(claudinho.version:string(), version.version)
+      assert.are.equal("number", type(version.major))
     end)
   end)
 end)

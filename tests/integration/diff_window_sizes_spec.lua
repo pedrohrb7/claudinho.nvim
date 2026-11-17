@@ -12,6 +12,9 @@ describe("openDiff window sizes", function()
   local diff = require("claudinho.diff")
   local terminal = require("claudinho.terminal")
   local tools = require("claudinho.tools.init")
+  local lockfile = require("claudinho.lockfile")
+  local tab_env = require("tests.helpers.tab_env")
+  local tab_env_dir, saved_lock_dir, saved_config
   local tab_name = "✻ [Claude Code] proposed.txt ⧉"
   local dir
 
@@ -23,14 +26,28 @@ describe("openDiff window sizes", function()
       vim.fn.writefile({ "alpha" }, dir .. "/" .. name)
     end
     tools.register_all()
-    require("claudinho")._create_commands()
+    require("claudinho.commands").setup({})
     _G.claude_deferred_responses = {}
+    -- The Claude terminal is a real tab, with its own private lock folder and a command that only waits.
+    tab_env_dir = tab_env.new()
+    saved_lock_dir = lockfile.lock_dir
+    lockfile.lock_dir = tab_env_dir.lock_dir
+    saved_config = require("claudinho").state.config
+    require("claudinho").state.config = vim.tbl_deep_extend("force", vim.deepcopy(saved_config), {
+      port_range = { min = 20000, max = 40000 },
+      terminal_cmd = "sh -c 'sleep 600'",
+      env = { HOME = tab_env_dir.home, CLAUDE_CONFIG_DIR = tab_env_dir.config_dir },
+    })
   end)
 
   after_each(function()
     pcall(vim.api.nvim_del_augroup_by_name, "window_sizes_spec")
     diff._cleanup_all_active_diffs("test cleanup")
-    terminal.close()
+    require("claudinho.sessions").kill_all()
+    require("claudinho.ui.window").teardown()
+    require("claudinho").state.config = saved_config
+    lockfile.lock_dir = saved_lock_dir
+    tab_env.remove(tab_env_dir)
     vim.cmd("silent! tabonly!")
     vim.cmd("silent! only!")
     vim.cmd("silent! %bwipeout!")
@@ -43,7 +60,6 @@ describe("openDiff window sizes", function()
     config.diff_opts = vim.tbl_extend("force", config.diff_opts, diff_opts or {}, { layout = layout })
     config.terminal = { provider = "native", split_side = "right", split_width_percentage = 0.30 }
     diff.setup(config)
-    terminal.setup(config.terminal, "sh -c 'sleep 600'")
   end
 
   -- Opens the Claude terminal right of the current window, `width` columns wide, and goes back to that window.
@@ -330,7 +346,7 @@ describe("openDiff window sizes", function()
   end)
 
   -- Opens a diff next to the user's window and a second one, which gets its own tab because the user's tab now has a
-  -- diff, then runs :ClaudeCodeCloseAllDiffs. The two names make pairs() list the diffs in different orders.
+  -- diff, then runs :Claudinho close-all-diffs. The two names make pairs() list the diffs in different orders.
   local function assert_close_all_returns_cursor(first_name, second_name)
     use_layout("vertical")
     two_editors()
@@ -338,19 +354,22 @@ describe("openDiff window sizes", function()
 
     open_diff("a.txt", first_name)
     assert.is_true(open_diff("b.txt", second_name).created_new_tab)
-    vim.cmd("ClaudeCodeCloseAllDiffs")
+    vim.cmd("Claudinho close-all-diffs")
 
     assert.equal(0, vim.tbl_count(diff._get_active_diffs()), "every diff closed")
     assert.equal(user_win, vim.api.nvim_get_current_win(), "the cursor is back where it was before the first diff")
   end
 
-  it("puts the cursor back where it was before the first diff after :ClaudeCodeCloseAllDiffs", function()
+  it("puts the cursor back where it was before the first diff after :Claudinho close-all-diffs", function()
     assert_close_all_returns_cursor("✻ [Claude Code] first.txt ⧉", "✻ [Claude Code] second.txt ⧉")
   end)
 
-  it("puts the cursor back where it was before the first diff after :ClaudeCodeCloseAllDiffs, names swapped", function()
-    assert_close_all_returns_cursor("✻ [Claude Code] second.txt ⧉", "✻ [Claude Code] first.txt ⧉")
-  end)
+  it(
+    "puts the cursor back where it was before the first diff after :Claudinho close-all-diffs, names swapped",
+    function()
+      assert_close_all_returns_cursor("✻ [Claude Code] second.txt ⧉", "✻ [Claude Code] first.txt ⧉")
+    end
+  )
 
   it("puts the cursor back in its window with keep_terminal_focus and no Claude terminal shown", function()
     use_layout("vertical", { keep_terminal_focus = true })

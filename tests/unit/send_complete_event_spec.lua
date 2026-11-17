@@ -10,6 +10,8 @@ describe("ClaudinhoSendComplete event (#228)", function()
   local claudinho
   local mock_terminal
   local saved_fn
+  local tab
+  local active_tab = require("tests.helpers.active_tab")
 
   local function setup_mocks()
     mock_terminal = {
@@ -69,12 +71,14 @@ describe("ClaudinhoSendComplete event (#228)", function()
     end
 
     claudinho = require("claudinho")
-    claudinho.setup({})
-    claudinho.state.server = {
-      broadcast = function()
-        return true
-      end,
-    }
+    claudinho.state.config = mock_config.apply()
+    tab = active_tab.install({
+      server = {
+        broadcast = function()
+          return true
+        end,
+      },
+    })
   end
 
   before_each(function()
@@ -83,6 +87,8 @@ describe("ClaudinhoSendComplete event (#228)", function()
   end)
 
   after_each(function()
+    active_tab.uninstall(tab)
+    tab = nil
     if saved_fn then
       _G.vim.fn.getcwd = saved_fn.getcwd
       _G.vim.fn.isdirectory = saved_fn.isdirectory
@@ -117,7 +123,7 @@ describe("ClaudinhoSendComplete event (#228)", function()
       return true, nil, { file_path = "src/foo.lua", start_line = 2, end_line = 4 }
     end
 
-    local ok = claudinho.send_at_mention("/abs/src/foo.lua", 2, 4, "ClaudeCodeSend")
+    local ok = claudinho.send_at_mention("/abs/src/foo.lua", 2, 4, "Claudinho send")
     assert.is_true(ok)
 
     local ev = last_send_complete()
@@ -125,7 +131,7 @@ describe("ClaudinhoSendComplete event (#228)", function()
     assert.is_equal("src/foo.lua", ev.opts.data.file_path)
     assert.is_equal(2, ev.opts.data.start_line)
     assert.is_equal(4, ev.opts.data.end_line)
-    assert.is_equal("ClaudeCodeSend", ev.opts.data.context)
+    assert.is_equal("Claudinho send", ev.opts.data.context)
     -- notification-only event must not re-process the buffer's modeline (#228 review)
     assert.is_false(ev.opts.modeline)
   end)
@@ -152,7 +158,7 @@ describe("ClaudinhoSendComplete event (#228)", function()
       return false, "broadcast failed"
     end
 
-    claudinho.send_at_mention("/abs/baz.lua", 1, 2, "ClaudeCodeSend")
+    claudinho.send_at_mention("/abs/baz.lua", 1, 2, "Claudinho send")
 
     assert.is_nil(last_send_complete())
   end)
@@ -169,7 +175,7 @@ describe("ClaudinhoSendComplete event (#228)", function()
       return 0
     end
 
-    claudinho.send_at_mention("/Users/test/project/src/foo.lua", 2, 4, "ClaudeCodeSend")
+    claudinho.send_at_mention("/Users/test/project/src/foo.lua", 2, 4, "Claudinho send")
 
     local ev = last_send_complete()
     assert.is_not_nil(ev)
@@ -187,7 +193,7 @@ describe("ClaudinhoSendComplete event (#228)", function()
       return 1
     end
 
-    claudinho.send_at_mention("/Users/test/project/lua", 2, 4, "ClaudeCodeSend")
+    claudinho.send_at_mention("/Users/test/project/lua", 2, 4, "Claudinho send")
 
     local ev = last_send_complete()
     assert.is_not_nil(ev)

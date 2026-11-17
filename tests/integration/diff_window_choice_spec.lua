@@ -19,6 +19,9 @@ describe("unified diff window choice", function()
   local diff = require("claudinho.diff")
   local terminal = require("claudinho.terminal")
   local tools = require("claudinho.tools.init")
+  local lockfile = require("claudinho.lockfile")
+  local tab_env = require("tests.helpers.tab_env")
+  local tab_env_dir, saved_lock_dir, saved_config
   local tab = "✻ [Claude Code] b.txt ⧉"
   local dir, path
 
@@ -29,7 +32,6 @@ describe("unified diff window choice", function()
       terminal_overrides or {}
     )
     diff.setup({ terminal = terminal_opts, diff_opts = diff_opts })
-    terminal.setup(terminal_opts, "sh -c 'sleep 600'")
   end
 
   local function open_terminal()
@@ -65,11 +67,25 @@ describe("unified diff window choice", function()
     vim.fn.writefile({ "one", "two" }, path)
     tools.register_all()
     _G.claude_deferred_responses = {}
+    -- The Claude terminal is a real tab, with its own private lock folder and a command that only waits.
+    tab_env_dir = tab_env.new()
+    saved_lock_dir = lockfile.lock_dir
+    lockfile.lock_dir = tab_env_dir.lock_dir
+    saved_config = require("claudinho").state.config
+    require("claudinho").state.config = vim.tbl_deep_extend("force", vim.deepcopy(saved_config), {
+      port_range = { min = 20000, max = 40000 },
+      terminal_cmd = "sh -c 'sleep 600'",
+      env = { HOME = tab_env_dir.home, CLAUDE_CONFIG_DIR = tab_env_dir.config_dir },
+    })
   end)
 
   after_each(function()
     diff._cleanup_all_active_diffs("test cleanup")
-    terminal.close()
+    require("claudinho.sessions").kill_all()
+    require("claudinho.ui.window").teardown()
+    require("claudinho").state.config = saved_config
+    lockfile.lock_dir = saved_lock_dir
+    tab_env.remove(tab_env_dir)
     vim.cmd("silent! tabonly")
     vim.cmd("silent! pclose")
     vim.cmd("silent! only")
@@ -182,6 +198,10 @@ describe("unified diff window choice", function()
     local terminal_win = open_terminal()
     vim.cmd("only")
     assert.equal(vim.o.columns, vim.api.nvim_win_get_width(terminal_win))
+    -- The Claude window has a fixed width (`winfixwidth`, spec section 8), which changes how Neovim shares the rest of
+    -- the screen between the two diff windows. Task 13 (window sizes in the diff) decides that; this case keeps checking
+    -- the share with a free width.
+    vim.wo[terminal_win].winfixwidth = false
 
     local width = vim.api.nvim_win_get_width(open_diff())
 

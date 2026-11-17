@@ -514,6 +514,7 @@ describe("session", function()
 
           assert.is_false(ok)
           assert.is_truthy(tostring(err):find(case.message, 1, true))
+          assert.is_truthy(tostring(err):find("^Could not start Claude 1: "))
           assert.is_truthy(tostring(err):find("Claude 1", 1, true))
           assert.same(case.log, log)
           -- Nothing is left on the session.

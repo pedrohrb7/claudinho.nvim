@@ -7,12 +7,11 @@ describe("health", function()
 
   -- State the stubs expose to the module under test
   local fake_state
-  local server_status
+  local tabs
   local executables
   local lock_readable
   local lock_stat
   local real_fs_stat
-  local claude_connected
 
   local function record(level)
     return function(msg)
@@ -34,11 +33,22 @@ describe("health", function()
     executables = { claude = true }
     lock_readable = true
     lock_stat = nil
-    claude_connected = true
-    server_status = { running = true, port = 12345, client_count = 1 }
+    -- One running tab, as a session holds it: port, server with its status, exit code.
+    tabs = {
+      [1] = {
+        number = 1,
+        state = "running",
+        lock_port = 12345,
+        server = {
+          get_status = function()
+            return { running = true, port = 12345, client_count = 1 }
+          end,
+        },
+      },
+    }
     fake_state = {
       initialized = true,
-      config = { terminal_cmd = nil, terminal = { provider = "native" } },
+      config = { terminal_cmd = nil, notify = true },
     }
 
     vim.health = {
@@ -79,15 +89,8 @@ describe("health", function()
         end,
       },
       state = fake_state,
-      is_claude_connected = function()
-        return claude_connected
-      end,
     }
-    package.loaded["claudinho.server.init"] = {
-      get_status = function()
-        return server_status
-      end,
-    }
+    package.loaded["claudinho.sessions"] = { state = { tabs = tabs } }
     package.loaded["claudinho.lockfile"] = { lock_dir = "/tmp/claude/ide" }
 
     package.loaded["claudinho.health"] = nil
@@ -97,7 +100,7 @@ describe("health", function()
   after_each(function()
     vim.loop.fs_stat = real_fs_stat
     package.loaded["claudinho"] = nil
-    package.loaded["claudinho.server.init"] = nil
+    package.loaded["claudinho.sessions"] = nil
     package.loaded["claudinho.lockfile"] = nil
     package.loaded["claudinho.health"] = nil
   end)
@@ -108,10 +111,9 @@ describe("health", function()
     expect(has_report("ok", "Neovim")).to_be_true()
     expect(has_report("ok", "is set up")).to_be_true()
     expect(has_report("ok", "Claude CLI found")).to_be_true()
-    expect(has_report("ok", "WebSocket server running on port 12345")).to_be_true()
-    expect(has_report("ok", "Lock file present")).to_be_true()
-    expect(has_report("ok", "Claude Code is connected")).to_be_true()
+    expect(has_report("ok", "Claude 1: running, port 12345, 1 client%(s%), lock file /tmp/claude/ide/12345.lock")).to_be_true()
     expect(has_report("error", ".")).to_be_false()
+    expect(has_report("warn", ".")).to_be_false()
   end)
 
   it("errors when setup() was not called and stops early", function()
@@ -155,21 +157,22 @@ describe("health", function()
     expect(has_report("ok", "Claude CLI found: /opt/claude/bin/claude")).to_be_true()
   end)
 
-  it("warns when the server is not running", function()
-    server_status = { running = false, port = nil, client_count = 0 }
+  it("reports no tabs as information, not as a problem", function()
+    tabs[1] = nil
 
     health.check()
 
-    expect(has_report("warn", "WebSocket server is not running")).to_be_true()
-    expect(has_report("ok", "Lock file present")).to_be_false()
+    expect(has_report("info", "No Claude tabs open")).to_be_true()
+    expect(has_report("error", ".")).to_be_false()
+    expect(has_report("warn", ".")).to_be_false()
   end)
 
-  it("errors when the lock file is missing", function()
+  it("errors when the lock file of a running tab is missing", function()
     lock_readable = false
 
     health.check()
 
-    expect(has_report("error", "Lock file missing")).to_be_true()
+    expect(has_report("error", "Claude 1: the lock file is missing: /tmp/claude/ide/12345.lock")).to_be_true()
     expect(has_report("error", "exists but cannot be read")).to_be_false()
   end)
 
@@ -179,9 +182,8 @@ describe("health", function()
 
     health.check()
 
-    expect(has_report("error", "Lock file exists but cannot be read: /tmp/claude/ide/12345.lock")).to_be_true()
-    expect(has_report("error", "Lock file missing")).to_be_false()
-    expect(has_report("ok", "Lock file present")).to_be_false()
+    expect(has_report("error", "Claude 1: the lock file exists but cannot be read: /tmp/claude/ide/12345.lock")).to_be_true()
+    expect(has_report("error", "lock file is missing")).to_be_false()
   end)
 
   it("reports a folder at the lock path as a missing lock file", function()
@@ -190,24 +192,56 @@ describe("health", function()
 
     health.check()
 
-    expect(has_report("error", "Lock file missing")).to_be_true()
+    expect(has_report("error", "the lock file is missing")).to_be_true()
     expect(has_report("error", "exists but cannot be read")).to_be_false()
   end)
 
-  it("reports info when no client is connected", function()
-    claude_connected = false
+  it("reports a line per tab, in order, with the exit code of an ended one", function()
+    tabs[3] = { number = 3, state = "exited", exit_code = 2 }
+    tabs[2] = {
+      number = 2,
+      state = "running",
+      server = {
+        get_status = function()
+          return { running = true, port = 23456, client_count = 0 }
+        end,
+      },
+    }
 
     health.check()
 
-    expect(has_report("info", "No Claude Code client connected")).to_be_true()
+    local tab_lines = {}
+    for _, report in ipairs(reports) do
+      if report.msg:find("^Claude %d") and not report.msg:find("CLI") then
+        table.insert(tab_lines, report.msg)
+      end
+    end
+    assert.are.same({
+      "Claude 1: running, port 12345, 1 client(s), lock file /tmp/claude/ide/12345.lock",
+      "Claude 2: running, port 23456, 0 client(s), lock file /tmp/claude/ide/23456.lock",
+      "Claude 3: exited (code 2)",
+    }, tab_lines)
   end)
 
-  it("reports the native terminal for the auto provider", function()
-    fake_state.config.terminal = { provider = "auto" }
+  it("tells that informative notifications are off", function()
+    fake_state.config.notify = false
 
     health.check()
 
-    expect(has_report("ok", "Terminal provider 'auto': native terminal")).to_be_true()
+    expect(has_report("info", "Informative notifications are off %(notify = false%)")).to_be_true()
+  end)
+
+  it("says nothing about notifications when they are on", function()
+    health.check()
+
+    expect(has_report("info", "Informative notifications")).to_be_false()
+  end)
+
+  it("no longer reports a terminal provider", function()
+    health.check()
+
+    expect(has_report("ok", "Terminal provider")).to_be_false()
+    expect(has_report("error", "Terminal provider")).to_be_false()
   end)
 
   describe("Neovim version", function()

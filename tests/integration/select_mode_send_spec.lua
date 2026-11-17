@@ -1,26 +1,26 @@
--- Real-Neovim check that README.md's `mode = "v"` `<cmd>ClaudeCodeSend<cr>` mapping (a :vmap) leaves Select mode.
+-- Real-Neovim check that README.md's `mode = "v"` `<cmd>Claudinho send<cr>` mapping (a :vmap) leaves Select mode.
 -- Neovim runs a :vmap from Select mode in Visual mode and queues a key that restores Select mode after it. Busted's
 -- mock vim has no typeahead, so there it is pending; scripts/run_integration_tests_individually.sh runs it in Neovim.
 if vim == nil or vim.fn.has("nvim") ~= 1 then
-  describe("<cmd>ClaudeCodeSend<cr> :vmap", function()
+  describe("<cmd>Claudinho send<cr> :vmap", function()
     pending("needs a real Neovim")
   end)
   return
 end
 
-describe("<cmd>ClaudeCodeSend<cr> :vmap", function()
+describe("<cmd>Claudinho send<cr> :vmap", function()
   local selection = require("claudinho.selection")
   local real_send, sent
 
   before_each(function()
-    require("claudinho")._create_commands()
+    require("claudinho.commands").setup({})
     real_send = selection.send_at_mention_for_visual_selection
     sent = {}
     selection.send_at_mention_for_visual_selection = function(line1, line2)
       table.insert(sent, { line1, line2 })
       return true
     end
-    vim.keymap.set("v", "<F6>", "<cmd>ClaudeCodeSend<cr>")
+    vim.keymap.set("v", "<F6>", "<cmd>Claudinho send<cr>")
     vim.api.nvim_buf_set_lines(0, 0, -1, false, { "one", "two", "three" })
     vim.api.nvim_win_set_cursor(0, { 1, 0 })
   end)

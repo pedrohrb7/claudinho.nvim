@@ -1035,9 +1035,6 @@ describe("Range Selection Tests", function()
       }
 
       mock_claudinho_main = {
-        state = {
-          server = mock_server,
-        },
         send_at_mention = function(file_path, start_line, end_line, context)
           -- Convert to the format expected by tests (1-indexed to 0-indexed conversion done here)
           local params = {
@@ -1131,8 +1128,10 @@ describe("Range Selection Tests", function()
       assert.are.equal(0, mock_server.last_broadcast.params.lineEnd)
     end)
 
-    it("should fail when server is not available", function()
-      mock_claudinho_main.state.server = nil
+    it("should fail when the send is refused (the active tab has exited)", function()
+      mock_claudinho_main.send_at_mention = function()
+        return false, "Claude 1 has exited; run :Claudinho tab-restart 1"
+      end
       local result = selection.send_at_mention_for_visual_selection(2, 4)
       assert(result == false)
     end)

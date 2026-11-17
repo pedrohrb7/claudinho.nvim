@@ -1,8 +1,11 @@
 require("tests.busted_setup")
 require("tests.mocks.vim")
 
-describe("ClaudeCodeAdd command", function()
+describe("Claudinho add command", function()
   local claudinho
+  local commands
+  local tab
+  local active_tab = require("tests.helpers.active_tab")
   local mock_server
   local mock_logger
   local saved_require = _G.require
@@ -95,12 +98,6 @@ describe("ClaudeCodeAdd command", function()
         return {
           setup = function() end,
         }
-      elseif mod == "claudinho.server.init" then
-        return {
-          get_status = function()
-            return { running = true, client_count = 1 }
-          end,
-        }
       elseif mod == "claudinho.terminal" then
         return {
           setup = function() end,
@@ -129,6 +126,7 @@ describe("ClaudeCodeAdd command", function()
 
     -- Clear package cache to ensure fresh require
     package.loaded["claudinho"] = nil
+    package.loaded["claudinho.commands"] = nil
     package.loaded["claudinho.config"] = nil
     package.loaded["claudinho.logger"] = nil
     package.loaded["claudinho.diff"] = nil
@@ -137,37 +135,76 @@ describe("ClaudeCodeAdd command", function()
     package.loaded["claudinho.utils"] = nil
 
     claudinho = require("claudinho")
+    commands = require("claudinho.commands")
 
-    -- Set up the server state manually for testing
-    claudinho.state.server = mock_server
-    claudinho.state.port = 12345
+    -- The active tab, whose queue broadcasts to the mock server
+    tab = active_tab.install({ server = mock_server })
   end)
 
   after_each(function()
+    active_tab.uninstall(tab)
     _G.require = saved_require
     package.loaded["claudinho"] = nil
+    package.loaded["claudinho.commands"] = nil
   end)
 
-  describe("command registration", function()
-    it("should register ClaudeCodeAdd command during setup", function()
-      claudinho.setup({ auto_start = false })
+  ---The handler of :Claudinho, called as `:Claudinho add <args>`.
+  ---The command reads `opts.fargs`; tests pass `{ args = "..." }`, so derive `fargs` by a plain whitespace split. Tests
+  ---can also pass `fargs` (the arguments after `add`) directly.
+  ---@return function handler
+  local function add_handler()
+    local raw_handler
+    for _, call in ipairs(vim.api.nvim_create_user_command.calls) do
+      if call.vals[1] == "Claudinho" then
+        raw_handler = call.vals[2]
+        break
+      end
+    end
 
-      -- Find the ClaudeCodeAdd command registration
-      local add_command_found = false
+    assert.is_function(raw_handler, "Command handler should be a function")
+
+    return function(opts)
+      local rest = opts.fargs
+      if rest == nil and opts.args ~= nil then
+        rest = opts.args == "" and {} or vim.split(opts.args, "%s+")
+      end
+      opts.fargs = { "add", unpack(rest or {}) }
+      return raw_handler(opts)
+    end
+  end
+
+  describe("command registration", function()
+    it("should register the Claudinho command during setup, with file completion for add", function()
+      commands.setup({})
+
+      local found = false
       for _, call in ipairs(vim.api.nvim_create_user_command.calls) do
-        if call.vals[1] == "ClaudeCodeAdd" then
-          add_command_found = true
+        if call.vals[1] == "Claudinho" then
+          found = true
 
           local config = call.vals[3]
-          assert.is_equal("+", config.nargs)
-          assert.is_equal("file", config.complete)
+          assert.is_equal("*", config.nargs)
+          assert.is_function(config.complete)
           assert.is_string(config.desc)
-          assert.is_true(string.find(config.desc, "line range") ~= nil, "Description should mention line range support")
           break
         end
       end
 
-      assert.is_true(add_command_found, "ClaudeCodeAdd command was not registered")
+      assert.is_true(found, "Claudinho command was not registered")
+    end)
+
+    it("should complete the files of the second word of add", function()
+      local real_getcompletion = vim.fn.getcompletion
+      finally(function()
+        vim.fn.getcompletion = real_getcompletion
+      end)
+      vim.fn.getcompletion = function(lead, kind)
+        assert.is_equal("/ex", lead)
+        assert.is_equal("file", kind)
+        return { "/existing/file.lua" }
+      end
+
+      assert.same({ "/existing/file.lua" }, commands.complete("/ex", "Claudinho add /ex", 17))
     end)
   end)
 
@@ -175,35 +212,35 @@ describe("ClaudeCodeAdd command", function()
     local command_handler
 
     before_each(function()
-      claudinho.setup({ auto_start = false })
-
-      local raw_handler
-      for _, call in ipairs(vim.api.nvim_create_user_command.calls) do
-        if call.vals[1] == "ClaudeCodeAdd" then
-          raw_handler = call.vals[2]
-          break
-        end
-      end
-
-      assert.is_function(raw_handler, "Command handler should be a function")
-
-      -- The command reads `opts.fargs`; tests pass `{ args = "..." }`, so derive
-      -- `fargs` by a plain whitespace split. Tests can also pass `fargs` directly.
-      command_handler = function(opts)
-        if opts.fargs == nil and opts.args ~= nil then
-          opts.fargs = opts.args == "" and {} or vim.split(opts.args, "%s+")
-        end
-        return raw_handler(opts)
-      end
+      commands.setup({})
+      command_handler = add_handler()
     end)
 
     describe("validation", function()
-      it("should error when server is not running", function()
-        claudinho.state.server = nil
+      it("should start the first tab and queue the file when there is no tab", function()
+        tab.closed = true
+        claudinho.state.config = { connection_timeout = 10000, connection_wait_delay = 600 }
+
+        command_handler({ args = "/existing/file.lua" })
+
+        assert.is_equal(1, tab.new_calls)
+        assert.is_equal(1, #tab.queue.mentions)
+        assert.is_equal("/existing/file.lua", tab.queue.mentions[1].file_path)
+        assert.spy(mock_logger.error).was_not_called()
+        assert.spy(mock_server.broadcast).was_not_called()
+      end)
+
+      it("should send nothing to a tab that has exited and say so", function()
+        tab.state = "exited"
 
         command_handler({ args = "/existing/file.lua" })
 
         assert.spy(mock_logger.error).was_called()
+        assert.is_equal(
+          "Claudinho add: Claude 1 has exited; run :Claudinho tab-restart 1",
+          mock_logger.error.calls[1].vals[2]
+        )
+        assert.spy(mock_server.broadcast).was_not_called()
       end)
 
       it("should error when no file path is provided", function()
@@ -238,7 +275,7 @@ describe("ClaudeCodeAdd command", function()
 
       it("should preserve a literal $ in the path (e.g. TanStack $param files)", function()
         -- Regression for the bug where vim.fn.expand treated `$post` as an
-        -- undefined env var and stripped it, breaking ClaudeCodeAdd on paths
+        -- undefined env var and stripped it, breaking :Claudinho add on paths
         -- like src/routes/$post.tsx.
         vim.fn.filereadable = spy.new(function(path)
           return path == "/current/dir/src/routes/$post.tsx" and 1 or 0
@@ -255,7 +292,7 @@ describe("ClaudeCodeAdd command", function()
       end)
 
       it("should expand the current-buffer token `%` (the documented 'add current buffer' keymap)", function()
-        -- `:ClaudeCodeAdd %` (README keymap) must resolve `%` to the current
+        -- `:Claudinho add %` (README keymap) must resolve `%` to the current
         -- buffer path via vim.fn.expand, NOT be left as the literal "%" -- which
         -- a tilde-only expansion would do, breaking the workflow.
         command_handler({ args = "%" })
@@ -523,15 +560,8 @@ describe("ClaudeCodeAdd command", function()
     it("should use the extracted broadcast_at_mention function", function()
       -- This test ensures that the command uses the centralized function
       -- rather than duplicating broadcast logic
-      claudinho.setup({ auto_start = false })
-
-      local command_handler
-      for _, call in ipairs(vim.api.nvim_create_user_command.calls) do
-        if call.vals[1] == "ClaudeCodeAdd" then
-          command_handler = call.vals[2]
-          break
-        end
-      end
+      commands.setup({})
+      local command_handler = add_handler()
 
       -- Mock the _format_path_for_at_mention function to verify it's called
       local original_format = claudinho._format_path_for_at_mention
@@ -541,6 +571,7 @@ describe("ClaudeCodeAdd command", function()
 
       command_handler({ args = "/existing/file.lua", fargs = { "/existing/file.lua" } })
 
+      assert.spy(claudinho._format_path_for_at_mention).was_called()
       assert.spy(mock_server.broadcast).was_called()
 
       -- Restore original function

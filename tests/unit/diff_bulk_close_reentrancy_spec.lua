@@ -46,7 +46,7 @@ describe("bulk close with a ClaudinhoDiffClosed handler that resolves another di
   end
 
   -- Stands in for the user's `User ClaudinhoDiffClosed` autocmd: on the first close, it
-  -- accepts the other open diff the way :ClaudeCodeDiffAccept does. Returns a getter for the
+  -- accepts the other open diff the way :Claudinho diff-accept does. Returns a getter for the
   -- tab name it accepted.
   local function accept_other_diff_on_first_close()
     local accepted
@@ -67,7 +67,7 @@ describe("bulk close with a ClaudinhoDiffClosed handler that resolves another di
     end
   end
 
-  -- The same handler, rejecting the other open diff the way :ClaudeCodeDiffDeny does.
+  -- The same handler, rejecting the other open diff the way :Claudinho diff-deny does.
   local function reject_other_diff_on_first_close()
     local rejected
     vim.api.nvim_exec_autocmds = function(event, opts)
@@ -89,7 +89,7 @@ describe("bulk close with a ClaudinhoDiffClosed handler that resolves another di
 
   local bulk_closes = {
     {
-      ":ClaudeCodeCloseAllDiffs and server stop (close_pending_diffs)",
+      ":Claudinho close-all-diffs and server stop (close_pending_diffs)",
       function()
         return diff.close_pending_diffs("user command")
       end,

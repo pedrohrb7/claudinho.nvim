@@ -42,8 +42,8 @@ The Neovim config lives at `fixtures/repro/init.lua`.
 A basic end-to-end diff flow you can use to sanity-check the environment:
 
 1. Start Claude:
-   - press `<leader>ac` (starts the server if needed, then opens the terminal), **or**
-   - run `:ClaudeCodeStart` then `:ClaudeCode`
+   - press `<leader>ac` (opens the Claude window; the first tab starts its own server), **or**
+   - run `:Claudinho`
 
 2. Ask Claude to edit `b.txt` (do not open it in a window first)
 3. Accept the diff with `:w` (or `<leader>aa`)
@@ -51,5 +51,5 @@ A basic end-to-end diff flow you can use to sanity-check the environment:
 
 ## Notes
 
-- This fixture uses the **native** terminal provider to avoid depending on external plugins.
+- This fixture runs Claude in Neovim's own terminal, so it depends on no external plugin.
 - To tweak the config, edit `fixtures/repro/init.lua` (or run `vve repro`).
