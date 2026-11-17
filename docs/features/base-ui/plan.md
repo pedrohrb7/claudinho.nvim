@@ -7,6 +7,8 @@
 - **Addendum 2026-11-12:** Neovim mínimo 0.12, decidido no `docs/PRD.md` e aplicado pela Fase 0 ([fork-limpo](../fork-limpo/plan.md)). Ver [Addendum](#addendum-2026-11-12-neovim-mínimo-012).
 - **Addendum 2026-11-15:** registro da origem do código, o bloqueio do claudecode.nvim vira aviso, mecanismo das chaves removidas, release `0.2.0` na entrega, notificações informativas desligadas por padrão, layout só pela config (sai o `:Claudinho layout`) e esclarecimento sobre o que persiste entre reinícios. Ver [Addendum](#addendum-2026-11-15-origem-do-código-claudecodenvim-notificações-layout-e-release).
 - **Addendum 2026-11-15 (2):** revisão da spec: errata da regra 85 repetida (a da seção 5 passa a ser a 89), `autoConnectIde` aceito e documentado, opções de diretório removidas, dois Neovims na mesma pasta documentados e o critério "nada muda fora das sessões do plugin" medido com o stub. Ver [Addendum](#addendum-2026-11-15-2-revisão-da-spec).
+- **Addendum 2026-11-17:** layout `left`, espelho do `right`, com tamanhos próprios em `window.left` (`width`, `diff_width`), decidido pelo usuário dentro desta feature. Ver [Addendum](#addendum-2026-11-17-layout-left).
+- **Addendum 2026-11-17 (2):** a janela do Claude fica sempre na borda do layout (`right`, `left` e `bottom`): quando outra janela toma a borda, o plugin a devolve, uma vez por mudança, sem opção para desligar. Ver [Addendum](#addendum-2026-11-17-2-janela-do-claude-sempre-na-borda).
 
 ## Goal
 
@@ -490,3 +492,138 @@ Muda esse critério de sucesso do **Goal**. Spec, Open question 4. A regra 57 n�
 | Critério                             | Como medir                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Nada muda fora das sessões do plugin | Testes automatizados com um `claude` stub provam que o plugin não escreve em `~/.claude/settings.json`, `~/.claude.json` nem em `.claude/` do projeto (mesmo checksum antes e depois de abrir, usar e fechar abas). Com o CLI real, o roteiro manual do usuário confere só os checksums de `~/.claude/settings.json` e de `.claude/` do projeto. Com a conexão automática do CLI desligada (padrão), um claude externo não se conecta sozinho a nenhuma aba (regras 62 e 90) |
+
+## Addendum 2026-11-17: layout `left`
+
+Origem: decisão do usuário em 2026-11-17, dentro desta feature (não é uma feature nova). As regras novas continuam a numeração do plano, a partir da 98. O texto aprovado acima não foi reescrito: onde ele e este adendo divergem, vale este adendo.
+
+Muda a regra 17 (tabela de layouts), o item de janela do **Scope**, o caso de borda "Troca de aba do Neovim (`gt`) com layout `right` ou `bottom`" e a lista de layouts válidos da regra 88. Complementa as regras 25, 70 e 85 e acrescenta um critério de sucesso ao **Goal**. A regra 86 não muda: `:Claudinho layout` continua um subcomando desconhecido.
+
+### 1. O layout
+
+98. Existe um quinto layout, `left`: split vertical na borda esquerda, na altura toda da tela, ao lado de todos os splits do editor. É o espelho do `right`. O layout padrão continua `right`.
+
+A tabela da regra 17 passa a ser:
+
+| Layout           | Onde fica                                                                                      | Tamanho (config, padrão) |
+| ---------------- | ---------------------------------------------------------------------------------------------- | ------------------------ |
+| `right` (padrão) | Split vertical na borda direita, na altura toda da tela, ao lado de todos os splits do editor  | Largura, 30% das colunas |
+| `left`           | Split vertical na borda esquerda, na altura toda da tela, ao lado de todos os splits do editor | Largura, 30% das colunas |
+| `bottom`         | Split horizontal na borda de baixo, na largura toda                                            | Altura, 30% das linhas   |
+| `float`          | Janela flutuante centralizada                                                                  | Largura e altura, 80%    |
+| `tab`            | Aba do Neovim própria, com a janela ocupando a aba inteira                                     | -                        |
+
+O item de janela do **Scope** passa a ser: "Janela do Claude com a barra de abas na winbar e os layouts `right` (padrão), `left`, `bottom`, `float` e `tab`" (sem a troca de layout, que a regra 86 já tirou).
+
+### 2. Config
+
+99. Os tamanhos do `left` ficam numa tabela própria da config, `window.left`, como cada layout tem a sua (regra 70):
+
+| Chave                    | Padrão | O que é                                                                                           |
+| ------------------------ | ------ | ------------------------------------------------------------------------------------------------- |
+| `window.left.width`      | `0.30` | Largura da janela, como fração das colunas                                                        |
+| `window.left.diff_width` | `nil`  | Largura da janela enquanto um diff está aberto, com as mesmas regras de `window.right.diff_width` |
+
+100. `window.left` e `window.right` são independentes: com o layout `left` valem só os tamanhos de `window.left`, e com o `right`, só os de `window.right`. Um `window.left` com outro layout ativo fica guardado e não tem efeito, como um `window.bottom` com o layout `right`.
+101. Um valor inválido em `window.left.width` ou `window.left.diff_width` cai no padrão da chave (`0.30` e `nil`), com uma mensagem de nível erro que nomeia a chave e o valor recebido, como as outras chaves da janela. É erro de config, então aparece mesmo com as notificações desligadas (regra 82), e vale qualquer que seja o layout ativo. O resto da config funciona.
+102. `left` entra nos layouts válidos de `window.layout`. A mensagem de erro da regra 88 lista `left` entre os válidos, e um valor inválido continua caindo em `right`.
+
+### 3. Diff com o layout `left`
+
+103. Com o `left`, a relação entre o diff e a janela do Claude é a do `right`, espelhada, lendo `window.left` no lugar de `window.right`:
+     - com `diff_opts.auto_resize_terminal` ligado (padrão), o plugin redimensiona a janela do Claude enquanto o diff está aberto e devolve a largura quando ele fecha, como faz no `right`; desligado, o plugin não mexe na largura;
+     - com `diff_opts.open_in_new_tab`, a janela do Claude vai para a borda esquerda da aba nova do Neovim, no lugar da direita;
+     - o diff abre na área do editor, nunca na janela do Claude, e a janela do Claude continua visível ao lado dele (a regra 25 só esconde a janela no `float`).
+
+### Casos de borda
+
+| Situação                                                                  | Comportamento esperado                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Troca de aba do Neovim (`gt`) com layout `right`, `left` ou `bottom`      | Substitui o caso do plano, só acrescentando o `left`. A janela do Claude fica na aba do Neovim onde estava; `toggle`/`open` em outra aba do Neovim leva a janela para lá, na borda do layout                              |
+| `left` com um explorer de arquivos já aberto na esquerda (ex.: nvim-tree) | Ao mostrar, a janela do Claude fica na borda esquerda, à esquerda do explorer, na altura toda; o plugin não move nem redimensiona o explorer                                                                              |
+| Explorer aberto na esquerda com a janela do Claude já visível no `left`   | O explorer abre onde o próprio comando dele manda; o plugin não reposiciona a janela do Claude na hora, como no `right` com uma barra lateral aberta à direita. Ao esconder e mostrar de novo, ela volta à borda esquerda |
+| `window.left.diff_width` inválido com o layout `right`                    | Erro nomeando a chave (regra 101); o valor cai em `nil` e nada muda no `right`                                                                                                                                            |
+
+### Critério de sucesso
+
+Acrescenta ao **Goal**:
+
+| Critério                          | Como medir                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| O layout `left` espelha o `right` | Com `window.layout = "left"` e dois splits verticais no editor: a janela do Claude começa na primeira coluna, tem a altura toda do editor e a largura de `window.left.width`; com um diff aberto, a largura segue as regras do `right` (regra 103), e com `diff_opts.open_in_new_tab` a janela fica na borda esquerda da aba nova |
+
+Os dois READMEs documentam o layout `left` e as chaves `window.left.width` e `window.left.diff_width`, e a mudança entra em `## [Unreleased]` no `CHANGELOG.md` (regra 78).
+
+## Addendum 2026-11-17 (2): janela do Claude sempre na borda
+
+Origem: relato e decisão do usuário em 2026-11-17, dentro desta feature. Com o neo-tree configurado na direita e o layout `right`, abrir o Claude dá `arquivo | neo-tree | Claude` (certo), mas fechar e reabrir o neo-tree dá `arquivo | Claude | neo-tree`, porque o neo-tree reabre na borda direita. Hoje o plano diz que o plugin não reposiciona a janela do Claude depois que outra janela toma a borda (só `hide` + `open` a devolve). Decisão do usuário: a janela do Claude fica sempre na borda, como a regra 17 promete ("na borda ... ao lado de todos os splits do editor"). As regras novas continuam a numeração do plano, a partir da 104. O texto aprovado acima não foi reescrito: onde ele e este adendo divergem, vale este adendo.
+
+Muda o caso de borda "Explorer aberto na esquerda com a janela do Claude já visível no `left`" do adendo de 2026-11-17 (layout `left`), incluindo a comparação com o `right` que ele faz. Complementa as regras 17, 23, 25, 98 e 103, acrescenta um critério de sucesso ao **Goal** e dois riscos.
+
+### 1. A regra
+
+104. Nos layouts `right`, `left` e `bottom`, a janela do Claude fica sempre na borda do layout, qualquer que seja a ordem em que as janelas abriram. O resultado é o mesmo de quando ela abre por último (regras 17 e 98):
+
+| Layout   | Na borda quer dizer                                                                      |
+| -------- | ---------------------------------------------------------------------------------------- |
+| `right`  | Última coluna da aba do Neovim, da primeira à última linha da área de janelas            |
+| `left`   | Primeira coluna da aba do Neovim, da primeira à última linha da área de janelas          |
+| `bottom` | Última linha de janelas da aba do Neovim, da primeira à última coluna da área de janelas |
+
+105. Quando uma mudança na disposição das janelas da aba do Neovim onde a janela do Claude está a tira da borda, o plugin a devolve à borda logo em seguida, sem ação do usuário. Vale para qualquer causa: uma janela aberta depois (neo-tree, nvim-tree, `:Lexplore`, `:botright vsplit`, `:botright copen`, um `:vsplit` feito de dentro da própria janela do Claude) ou uma janela movida (`<C-w>L` em outra janela, `<C-w>H` ou `<C-w>K` na própria janela do Claude). Quem quer a janela em outro lugar troca `window.layout` (regra 85).
+106. De volta à borda, a janela do Claude mantém o tamanho que tinha antes da mudança: a largura no `right` e no `left`, a altura no `bottom`. Esse tamanho é o da config (`window.<lado>.width`, `window.bottom.height`), o do diff enquanto um diff a redimensiona (regra 103) ou o que o usuário deu à mão, o que estiver valendo no momento.
+107. O plugin não move nem redimensiona nenhuma outra janela por conta própria. As outras ficam na mesma ordem, do lado de dentro da janela do Claude (no caso do relato: `arquivo | neo-tree | Claude`). Só muda nelas o que o Neovim muda ao mover uma janela: uma janela com `winfixwidth` (`winfixheight` no `bottom`) mantém o tamanho, e as outras dividem o espaço que sobra pelas regras do Neovim (`'equalalways'`).
+108. A correção não muda a janela em foco, o modo (terminal, normal, inserção), o cursor nem o buffer de nenhuma janela, e a janela do Claude continua a mesma, com a winbar e a statusline dela. Ela não mostra notificação, nem com a opção `notify` da regra 80 ligada. Mover a janela não é fechá-la: a regra 23 não se aplica.
+109. Só janelas não flutuantes contam. Abrir, mover ou fechar uma janela flutuante (mini.files, `:Oil --float`, popups, notificações) nunca dispara a correção. Mudar só tamanhos (`<C-w>>`, `<C-w>=`, arrastar a divisa com o mouse, o redimensionamento do diff, a volta dos tamanhos quando o diff fecha) também não: isso não tira a janela da borda.
+110. Nada disso vale nos layouts `float` e `tab`, com a janela do Claude escondida, nem nas abas do Neovim onde ela não está. Ao aparecer de novo, ela abre na borda, como hoje (regra 17).
+111. Sem laço: uma correção por mudança. Se a janela do Claude sai da borda de novo logo depois de uma correção, antes da próxima ação do usuário (outro plugin que também insiste na borda e reage à correção), o plugin não corrige outra vez: a janela fica onde o outro plugin a deixou, sem erro e sem notificação, até a próxima mudança de disposição que venha depois de uma ação do usuário, ou até `hide` + `open`. No pior caso, cada ação do usuário causa uma correção só; nunca um laço, e o Neovim continua respondendo.
+112. Não existe opção na config para desligar a correção. O layout é uma borda (regra 17), e o usuário decidiu que a janela fica sempre nela; uma opção dobraria os casos de teste e a documentação sem pedido real. Se um caso real aparecer (ver os riscos), uma opção booleana ligada por padrão entra depois sem quebrar nenhuma config.
+
+### 2. `bottom` também
+
+Decisão deste adendo: a regra vale também para o `bottom`. A regra 17 faz ao `bottom` a mesma promessa que ao `right` ("na borda de baixo, na largura toda"), o mecanismo é o mesmo e a regra 111 limita a disputa. Deixar o `bottom` de fora daria dois comportamentos para a mesma regra 17. A borda de baixo é a mais disputada (quickfix, terminais com `botright`, listas de diagnóstico); com a correção, essas janelas ficam acima da janela do Claude, na largura da área do editor, que é onde elas ficariam se o Claude tivesse aberto por último.
+
+### 3. Diff
+
+O diff continua com as regras dele; este adendo só diz como elas convivem com a correção.
+
+| Regra / caso                                                        | Como convive                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Regra 25 (`float` esconde a janela quando um diff abre)             | Sem relação: o `float` fica fora da correção (regra 110)                                                                                                                                                                                                                                      |
+| Regra 103 e `diff_opts.auto_resize_terminal`                        | O redimensionamento do diff só muda tamanhos e não dispara nada (regra 109). Uma correção durante o diff mantém a largura do diff (regra 106), e quando o diff fecha a largura volta como hoje                                                                                                |
+| Janelas do diff na mesma aba do Neovim                              | Abrem na área do editor (a janela que o plugin escolhe nunca é a do Claude nem um explorer), então ficam do lado de dentro e nada se move                                                                                                                                                     |
+| Diff com a janela do Claude sozinha na aba (fallback do issue #231) | A janela do diff fica do lado de dentro: à esquerda do Claude no `right`, à direita no `left`, acima no `bottom`. A janela do Claude fica na borda com o tamanho dela e não se move de forma visível. Quando o diff fecha, a janela do fallback fecha e o Claude volta a ocupar a aba sozinho |
+| `diff_opts.open_in_new_tab` (regra 103)                             | A janela do Claude da aba original segue este adendo na aba dela. A janela que mostra o terminal na aba nova do diff é posta na borda quando a aba abre (regra 103) e fica fora da correção: ela é temporária e fecha com o diff, então uma janela aberta depois na aba do diff não a move    |
+
+### Casos de borda
+
+| Situação                                                                                                     | Comportamento esperado                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Explorer aberto na esquerda com a janela do Claude já visível no `left`                                      | Substitui o caso do adendo de 2026-11-17 (layout `left`). O explorer abre onde o comando dele manda (ex.: nvim-tree e `:Lexplore` na primeira coluna); logo em seguida o plugin devolve o Claude à primeira coluna, e o explorer fica à direita dele com a largura dele (regras 105 a 107). `hide` + `open` não é mais necessário |
+| `right`, neo-tree na direita: Claude visível, neo-tree fechado e reaberto (relato do usuário)                | O neo-tree reabre na borda direita; o plugin devolve o Claude à última coluna: `arquivo \| neo-tree \| Claude`, com a largura que o Claude tinha e o neo-tree com a dele                                                                                                                                                          |
+| `right` ou `left` com uma janela aberta embaixo na largura toda (`:botright copen`, `:botright split`)       | O Claude volta a ter a altura toda; a janela de baixo fica embaixo da área do editor, com a altura dela quando tem `winfixheight`                                                                                                                                                                                                 |
+| `bottom` com uma janela aberta embaixo (`:botright copen`) ou na altura toda do lado (`:botright vsplit`)    | O Claude volta a ser a última linha, na largura toda; a outra janela fica acima dele                                                                                                                                                                                                                                              |
+| O usuário move a própria janela do Claude (`<C-w>H`, `<C-w>K`, `<C-w>x`)                                     | O plugin a devolve à borda (regra 105); para outro lugar, o caminho é `window.layout`                                                                                                                                                                                                                                             |
+| `:vsplit` feito de dentro da janela do Claude com `splitright`                                               | A janela nova (que mostra o mesmo terminal) toma a borda; o plugin devolve o Claude à borda, e a janela nova fica do lado de dentro como qualquer outra janela                                                                                                                                                                    |
+| Duas barras laterais no mesmo lado (ex.: neo-tree e uma de símbolos)                                         | As duas ficam do lado de dentro, na ordem em que estavam; o Claude na borda                                                                                                                                                                                                                                                       |
+| Outro plugin devolve a janela dele à borda sempre que o layout muda (gerenciadores de janela como edgy.nvim) | Regra 111: uma correção; a reação do outro plugin vence, sem laço, sem erro e sem notificação; na próxima ação do usuário que mude a disposição, no máximo mais uma correção                                                                                                                                                      |
+| Janela de linha de comando (`q:`) aberta                                                                     | O Neovim não deixa mover janelas enquanto ela está aberta; nada é corrigido nesse meio-tempo e nenhum erro aparece. Se o Claude ainda estiver fora da borda quando ela fecha, a correção acontece nesse momento                                                                                                                   |
+| Tela estreita: as larguras fixas não cabem nas colunas                                                       | O Neovim reparte o espaço pelas regras dele; o Claude volta à borda com a maior largura possível até a dele, sem erro                                                                                                                                                                                                             |
+| Janela do Claude na aba 1 do Neovim e o usuário abre splits na aba 2                                         | Nada acontece (regra 110); a janela continua onde estava na aba 1                                                                                                                                                                                                                                                                 |
+
+### Critério de sucesso
+
+Acrescenta ao **Goal**:
+
+| Critério                         | Como medir                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A janela do Claude fica na borda | Teste de integração, para `right`, `left` e `bottom`: com o Claude visível, abrir uma janela na borda dele com `winfixwidth` (`winfixheight` no `bottom`) e tamanho fixo (`botright vsplit`, `topleft vsplit`, `botright split`): o Claude volta à borda, na altura toda (largura toda no `bottom`), com o tamanho de antes, a outra janela fica colada a ele do lado de dentro com o tamanho dela, e a janela em foco e o modo não mudam. Com um autocmd de teste que devolve a outra janela à borda a cada mudança de disposição, um `botright vsplit` causa no máximo uma correção e o Neovim continua respondendo |
+
+### Riscos
+
+| Risco                                                                                                     | Impacto                                                                | Mitigação                                                                                                                                                                |
+| --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Outro plugin também insiste na borda (gerenciadores de janela como edgy.nvim, barras que se reposicionam) | Uma troca visível por ação do usuário; o outro plugin fica com a borda | Regra 111 limita a uma correção por ação, sem laço; o README registra o caso. Se um caso real incomodar, a opção booleana da regra 112 entra depois, sem quebrar config  |
+| Mover a janela muda tamanhos que o usuário ou o diff acertaram                                            | Explorer ou diff com largura errada depois da correção                 | Regras 106 e 107; o teste do critério confere os tamanhos das duas janelas, e a spec cobre a correção durante um diff aberto e o fechamento do diff (volta dos tamanhos) |
+
+A spec atualiza junto o que dizia "não reposiciona": a tabela de explorers da seção 15 e o roteiro manual do layout `left`. Os dois READMEs explicam que a janela do Claude volta sozinha à borda e o limite da regra 111, e a mudança entra em `## [Unreleased]` no `CHANGELOG.md` (regra 78).
