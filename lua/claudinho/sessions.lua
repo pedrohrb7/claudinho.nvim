@@ -251,9 +251,10 @@ end
 ---Close tab `n`: its diffs, process, server and files end, and the bar loses it. The tab with the next higher number
 ---becomes active, else the next lower one; with none left the window closes.
 ---@param n integer
+---@param opts { buf_gone: boolean }|nil `buf_gone`: the buffer is already being deleted (BufDelete, BufWipeout)
 ---@return boolean ok
 ---@return string|nil error
-function M.close(n)
+function M.close(n, opts)
   local s = M.state.tabs[n]
   if not s then
     local err = "No " .. label(tonumber(n) or 0)
@@ -281,7 +282,7 @@ function M.close(n)
     win.release(s.buf, neighbour and neighbour.buf or nil)
   end
 
-  require("claudinho.session").close(s, "tab closed")
+  require("claudinho.session").close(s, "tab closed", opts)
   M.state.tabs[n] = nil
   for id, number in pairs(M.state.by_server) do
     if number == n then
@@ -510,7 +511,7 @@ function M.setup_autocmds()
     callback = function(args)
       local n = tab_of_buffer(args.buf)
       if n and not M.state.tabs[n].closing then
-        M.close(n)
+        M.close(n, { buf_gone = true })
       end
     end,
   })

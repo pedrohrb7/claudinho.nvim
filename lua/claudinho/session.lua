@@ -188,12 +188,26 @@ local function handle_exit(session, job, code)
 end
 
 ---A key typed in an ended terminal must not close its buffer (rule 39): a terminal buffer with no process starts no
----terminal mode.
+---terminal mode. A terminal that ends while in terminal mode leaves it at once (TermClose), before any key arrives.
 ---@param session ClaudinhoSession
 ---@param buf integer
 local function guard_ended_terminal(session, buf)
+  local group = vim.api.nvim_create_augroup("ClaudinhoSession", { clear = false })
+  vim.api.nvim_create_autocmd("TermClose", {
+    group = group,
+    buffer = buf,
+    callback = function()
+      if
+        session.buf == buf
+        and vim.api.nvim_get_current_buf() == buf
+        and vim.api.nvim_get_mode().mode:sub(1, 1) == "t"
+      then
+        vim.cmd.stopinsert()
+      end
+    end,
+  })
   vim.api.nvim_create_autocmd("TermEnter", {
-    group = vim.api.nvim_create_augroup("ClaudinhoSession", { clear = false }),
+    group = group,
     buffer = buf,
     callback = function()
       if session.state == "exited" and session.buf == buf then
@@ -394,7 +408,9 @@ end
 ---does nothing.
 ---@param session ClaudinhoSession
 ---@param reason string|nil Why it closes, for the log and for the diffs
-function M.close(session, reason)
+---@param opts { buf_gone: boolean }|nil `buf_gone`: Neovim is already deleting the buffer, so it is not deleted again
+function M.close(session, reason, opts)
+  local buf_gone = opts ~= nil and opts.buf_gone == true
   if session.closing then
     return
   end
@@ -432,7 +448,12 @@ function M.close(session, reason)
   end
 
   local buf, job = session.buf, session.job
-  if job and buf and vim.api.nvim_buf_is_valid(buf) then
+  if buf_gone then
+    -- The buffer goes anyway: the job is stopped with no wait and no second delete (E937).
+    if job then
+      pcall(vim.fn.jobstop, job)
+    end
+  elseif job and buf and vim.api.nvim_buf_is_valid(buf) then
     -- Deleting a terminal buffer while a write to its job is pending hangs Neovim (neovim/neovim#42508), so the
     -- delete waits for the job to end. jobstop gives 0 for a job that already ended: TermClose has run then.
     local ended = false
@@ -456,7 +477,7 @@ function M.close(session, reason)
   release(session)
 
   session.buf = nil
-  if buf and vim.api.nvim_buf_is_valid(buf) then
+  if not buf_gone and buf and vim.api.nvim_buf_is_valid(buf) then
     pcall(vim.api.nvim_buf_delete, buf, { force = true })
   end
   logger.debug("session", label(session) .. " closed:", reason)

@@ -43,6 +43,12 @@ describe("sessions", function()
       table.insert(self.broadcasts, { method = method, params = params, on_written = on_written })
       return true
     end
+    function server:get_status()
+      return { clients = {} }
+    end
+    function server:stop()
+      return true
+    end
     function server:drain(ms)
       self.drained = self.drained + 1
       self.drain_ms = ms
@@ -799,6 +805,57 @@ describe("sessions", function()
 
       assert.equals(0, count("session.close.1"))
       assert.equals(s, sessions.state.tabs[1])
+    end)
+    describe("with the real session close", function()
+      local deleted
+
+      before_each(function()
+        -- The registry's closing calls the real session.close; only the Neovim API under it is a fake.
+        local fake = package.loaded["claudinho.session"]
+        package.loaded["claudinho.session"] = nil
+        local real = require("claudinho.session")
+        package.loaded["claudinho.session"] = fake
+        fake.close = real.close
+        deleted = {}
+        stub(vim.api, "nvim_buf_is_valid", function()
+          return true
+        end)
+        stub(vim.api, "nvim_buf_delete", function(buf)
+          table.insert(deleted, buf)
+        end)
+      end)
+
+      it("does not delete the buffer again when the tab closes from BufWipeout", function()
+        local s = assert(sessions.new())
+        local buf = s.buf
+        sessions.setup_autocmds()
+
+        callback_of("BufWipeout")({ buf = buf })
+
+        assert.is_nil(sessions.state.tabs[1])
+        assert.same({}, deleted)
+      end)
+
+      it("does not delete the buffer again when the tab closes from BufDelete", function()
+        local s = assert(sessions.new())
+        local buf = s.buf
+        sessions.setup_autocmds()
+
+        callback_of("BufDelete")({ buf = buf })
+
+        assert.is_nil(sessions.state.tabs[1])
+        assert.same({}, deleted)
+      end)
+
+      it("still deletes the buffer when the tab is closed by the user", function()
+        local s = assert(sessions.new())
+        local buf = s.buf
+
+        sessions.close(1)
+
+        assert.is_nil(sessions.state.tabs[1])
+        assert.same({ buf }, deleted)
+      end)
     end)
   end)
 end)
