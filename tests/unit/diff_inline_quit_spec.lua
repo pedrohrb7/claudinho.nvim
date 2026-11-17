@@ -27,7 +27,7 @@ describe("Unified diff and :q", function()
   end
 
   local function open_diff()
-    diff.setup({ terminal = { provider = "none" }, diff_opts = { layout = "unified" } })
+    diff.setup({ diff_opts = { layout = "unified" } })
     local result
     local co = coroutine.create(function()
       result = open_diff_tool.handler({

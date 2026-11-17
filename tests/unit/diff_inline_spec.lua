@@ -395,11 +395,6 @@ describe("Inline diff module", function()
       -- Stub terminal module with defaults
       package.loaded["claudinho.terminal"] = {
         defaults = {
-          split_side = "right",
-          split_width_percentage = 0.30,
-          provider = "auto",
-          show_native_term_exit_tip = true,
-          auto_close = true,
           env = {},
         },
         get_active_terminal_bufnr = function()
@@ -417,11 +412,6 @@ describe("Inline diff module", function()
       package.loaded["claudinho.terminal"] = nil
       package.loaded["claudinho.terminal"] = {
         defaults = {
-          split_side = "right",
-          split_width_percentage = 0.30,
-          provider = "auto",
-          show_native_term_exit_tip = true,
-          auto_close = true,
           env = {},
         },
         get_active_terminal_bufnr = function()
@@ -442,11 +432,6 @@ describe("Inline diff module", function()
       package.loaded["claudinho.terminal"] = nil
       package.loaded["claudinho.terminal"] = {
         defaults = {
-          split_side = "right",
-          split_width_percentage = 0.30,
-          provider = "auto",
-          show_native_term_exit_tip = true,
-          auto_close = true,
           env = {},
         },
         get_active_terminal_bufnr = function()

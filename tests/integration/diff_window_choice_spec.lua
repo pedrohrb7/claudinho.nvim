@@ -25,13 +25,9 @@ describe("unified diff window choice", function()
   local tab = "✻ [Claude Code] b.txt ⧉"
   local dir, path
 
-  local function use(diff_opts, terminal_overrides)
-    local terminal_opts = vim.tbl_extend(
-      "force",
-      { provider = "native", split_side = "right", split_width_percentage = 0.30 },
-      terminal_overrides or {}
-    )
-    diff.setup({ terminal = terminal_opts, diff_opts = diff_opts })
+  local function use(diff_opts, window_overrides)
+    local window = vim.tbl_deep_extend("force", { layout = "right", right = { width = 0.30 } }, window_overrides or {})
+    diff.setup({ window = window, diff_opts = diff_opts })
   end
 
   local function open_terminal()
@@ -198,18 +194,32 @@ describe("unified diff window choice", function()
     local terminal_win = open_terminal()
     vim.cmd("only")
     assert.equal(vim.o.columns, vim.api.nvim_win_get_width(terminal_win))
-    -- The Claude window has a fixed width (`winfixwidth`, spec section 8), which changes how Neovim shares the rest of
-    -- the screen between the two diff windows. Task 13 (window sizes in the diff) decides that; this case keeps checking
-    -- the share with a free width.
-    vim.wo[terminal_win].winfixwidth = false
+    assert.is_true(vim.wo[terminal_win].winfixwidth, "the Claude window has a fixed width")
 
     local width = vim.api.nvim_win_get_width(open_diff())
 
     assert.is_true(width >= math.floor(vim.o.columns / 3) - 1, "the diff is " .. width .. " columns wide")
   end)
 
-  it("sizes a Claude terminal it splits with terminal.diff_split_width_percentage", function()
-    use({ layout = "unified" }, { diff_split_width_percentage = 0.20 })
+  it("puts the Claude terminal below the diff in its new tab with window.layout = bottom, at the full width", function()
+    require("claudinho").state.config.window.layout = "bottom"
+    use({ layout = "unified", open_in_new_tab = true }, { layout = "bottom", right = { diff_width = 0.20 } })
+    open_terminal()
+    vim.cmd("wincmd p")
+
+    local diff_win = open_diff()
+
+    local terminal_win = diff._get_active_diffs()[tab].terminal_win_in_new_tab
+    assert.is_not_nil(terminal_win, "the new tab shows the Claude terminal")
+    assert.equal(vim.o.columns, vim.api.nvim_win_get_width(terminal_win), "no width change for the bottom layout")
+    assert.is_true(
+      vim.api.nvim_win_get_position(terminal_win)[1] > vim.api.nvim_win_get_position(diff_win)[1],
+      "the terminal is below the diff"
+    )
+  end)
+
+  it("sizes a Claude terminal it splits with window.right.diff_width", function()
+    use({ layout = "unified" }, { right = { diff_width = 0.20 } })
     local terminal_win = open_terminal()
     vim.cmd("only")
 
@@ -218,8 +228,8 @@ describe("unified diff window choice", function()
     assert.equal(math.floor(vim.o.columns * 0.20), vim.api.nvim_win_get_width(terminal_win))
   end)
 
-  it("sizes the Claude terminal in its new tab with terminal.diff_split_width_percentage", function()
-    use({ layout = "unified", open_in_new_tab = true }, { diff_split_width_percentage = 0.20 })
+  it("sizes the Claude terminal in its new tab with window.right.diff_width", function()
+    use({ layout = "unified", open_in_new_tab = true }, { right = { diff_width = 0.20 } })
     open_terminal()
     vim.cmd("wincmd p")
 
@@ -254,12 +264,12 @@ describe("unified diff window choice", function()
   -- The user is in a tab with only the preview window, and the Claude terminal is in a later tab. The new tab goes
   -- between them, so it comes first in the window list.
   for _, case in ipairs({
-    { "with terminal.diff_split_width_percentage", {}, { diff_split_width_percentage = 0.5 } },
+    { "with window.right.diff_width", {}, { right = { diff_width = 0.5 } } },
     { "with auto_resize_terminal = false", { auto_resize_terminal = false }, {} },
   }) do
-    local name, extra_diff_opts, terminal_overrides = case[1], case[2], case[3]
+    local name, extra_diff_opts, window_overrides = case[1], case[2], case[3]
     it("keeps the width of the Claude terminal in another tab after close_tab " .. name, function()
-      use(vim.tbl_extend("force", { layout = "unified", open_in_new_tab = true }, extra_diff_opts), terminal_overrides)
+      use(vim.tbl_extend("force", { layout = "unified", open_in_new_tab = true }, extra_diff_opts), window_overrides)
       vim.cmd("tabnew")
       local terminal_win = open_terminal()
       local terminal_width = vim.api.nvim_win_get_width(terminal_win)
@@ -275,8 +285,8 @@ describe("unified diff window choice", function()
     end)
   end
 
-  it("opens next to an editor window when terminal.split_width_percentage is not a number", function()
-    use({ layout = "unified" }, { split_width_percentage = "wide" })
+  it("opens next to an editor window when window.right.width is not a number", function()
+    use({ layout = "unified" }, { right = { width = "wide" } })
     open_terminal()
     vim.cmd("wincmd p")
 

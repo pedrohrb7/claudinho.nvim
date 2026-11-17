@@ -15,7 +15,7 @@ describe("diff mode in a window that left a split diff", function()
 
   local function open_diff(path)
     path = path or file
-    diff.setup({ terminal = { provider = "none" }, diff_opts = { layout = "vertical" } })
+    diff.setup({ diff_opts = { layout = "vertical" } })
     local call = tools.handle_invoke({ id = "left_window_spec" }, {
       name = "openDiff",
       arguments = { old_file_path = path, new_file_path = path, new_file_contents = "one\nTWO\n", tab_name = tab },

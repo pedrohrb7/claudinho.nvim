@@ -95,7 +95,7 @@ describe("Diff in a new tab: attaching the Claude terminal buffer", function()
     describe("with layout = " .. layout, function()
       before_each(function()
         diff.setup({
-          terminal = { split_side = "right", split_width_percentage = 0.30 },
+          window = { layout = "right", right = { width = 0.30 } },
           diff_opts = {
             layout = layout,
             open_in_new_tab = true,

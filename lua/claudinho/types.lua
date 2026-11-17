@@ -36,24 +36,6 @@
 -- Behavior when rejecting new-file diffs
 ---@alias ClaudinhoNewFileRejectBehavior "keep_empty"|"close_window"
 
--- Terminal split side positioning
----@alias ClaudinhoSplitSide "left"|"right"
-
--- In-tree terminal provider names
----@alias ClaudinhoTerminalProviderName "auto"|"native"|"external"|"none"
-
--- Terminal provider-specific options
----@class ClaudinhoTerminalProviderOptions
----@field external_terminal_cmd string|(fun(cmd: string, env: table): string)|table|nil Command for external terminal (string template with %s or function)
-
--- Working directory resolution context and provider
----@class ClaudinhoCwdContext
----@field file string|nil   -- absolute path of current buffer file (if any)
----@field file_dir string|nil -- directory of current buffer file (if any)
----@field cwd string        -- current Neovim working directory
-
----@alias ClaudinhoCwdProvider fun(ctx: ClaudinhoCwdContext): string|nil
-
 -- @ mention queued for Claude Code
 ---@class ClaudinhoMention
 ---@field file_path string The absolute file path to mention
@@ -74,19 +56,7 @@
 
 -- Terminal configuration
 ---@class ClaudinhoTerminalConfig
----@field split_side ClaudinhoSplitSide
----@field split_width_percentage number
----@field diff_split_width_percentage number? -- optional terminal width while a diff is active; defaults to split_width_percentage
----@field provider ClaudinhoTerminalProviderName
----@field show_native_term_exit_tip boolean
----@field terminal_cmd string?
----@field provider_opts ClaudinhoTerminalProviderOptions?
----@field auto_close boolean
----@field auto_insert boolean -- auto-enter terminal mode when the plugin opens/focuses the Claude terminal; native not on <C-w>l, except after a new-tab diff put the terminal in its tab and until that window closes (#232); false keeps Normal mode + scroll position
----@field env table<string, string>
----@field cwd string|nil                 -- static working directory for Claude terminal
----@field git_repo_cwd boolean|nil      -- use git root of current file/cwd as working directory
----@field cwd_provider? ClaudinhoCwdProvider -- custom function to compute working directory
+---@field auto_insert boolean? -- auto-enter terminal mode when the plugin opens/focuses the Claude terminal; false keeps Normal mode + scroll position
 ---@field fix_streamed_paste boolean|"auto"|nil -- work around Neovim <0.12.2 terminal paste fragmentation (#161); "auto" (default) enables only on affected versions
 
 -- Port range configuration
@@ -104,7 +74,6 @@
 -- Main configuration structure
 ---@class ClaudinhoConfig
 ---@field port_range ClaudinhoPortRange
----@field auto_start boolean
 ---@field terminal_cmd string|nil
 ---@field env table<string, string>
 ---@field log_level ClaudinhoLogLevel
@@ -187,6 +156,7 @@
 ---@class ClaudinhoState
 ---@field config ClaudinhoConfig
 ---@field initialized boolean
+---@field removed_found ClaudinhoRemovedOption[]? -- the removed keys the last setup() found in the user's config, for the health check
 
 -- This module only defines types, no runtime functionality
 return {}

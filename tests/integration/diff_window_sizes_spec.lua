@@ -58,7 +58,6 @@ describe("openDiff window sizes", function()
   local function use_layout(layout, diff_opts)
     local config = vim.deepcopy(require("claudinho.config").defaults)
     config.diff_opts = vim.tbl_extend("force", config.diff_opts, diff_opts or {}, { layout = layout })
-    config.terminal = { provider = "native", split_side = "right", split_width_percentage = 0.30 }
     diff.setup(config)
   end
 

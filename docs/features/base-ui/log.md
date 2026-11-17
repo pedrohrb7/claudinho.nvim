@@ -327,3 +327,35 @@ Mode: `--step`, same gate policy as the 2026-11-15 run. The run state `.claude/r
   - Old `:ClaudeCode*` names give E492.
   - A tab that cannot start (command missing, every port in use) shows one line `Could not start Claude 1: <reason>` that fits the command line.
 - **Out of scope:** em dashes in pre-existing comments at `lua/claudinho/tools/open_file.lua:603` and `lua/claudinho/terminal/paste_fix.lua:133` (the spec's Verification dash check covers `lua/`); to the backlog.
+
+### Task 13 - Chaves removidas (terminal e diretório), cwd.lua e tamanhos da janela no diff (done)
+
+- **Files:**
+  - `lua/claudinho/config.lua`: the removed-keys table of section 4 (16 new rows, including the six directory keys; the old `terminal.provider = "snacks"` row is gone: `terminal.provider` is one row for any value); `without_removed_options(user_config, { notify })` returns `(config, found)` and warns only with `notify`; `auto_start`, the `terminal.provider` default and the `provider_opts` validation removed; `terminal` defaults to `{}`.
+  - `lua/claudinho/init.lua`: `setup` passes `opts.notify == true` and keeps the found rows in `state.removed_found`; a comment about the removed directory keys reworded.
+  - `lua/claudinho/diff.lua`: reads `window.right.width` and `window.right.diff_width` (`_resolve_split_width_percentage` kept as the test seam); resizes only for `window.layout = "right"`; after sizing a fixed-width (`winfixwidth`) Claude window in the current tab, for the `diff` phase, runs `wincmd =` so the other windows share the rest equally; a new-tab diff puts the Claude window on the right, or below (`split` + `wincmd J`) with `bottom`.
+  - `lua/claudinho/health.lua`: one WARN per removed key from `state.removed_found` (the warning text without the `[Claudinho] ` prefix).
+  - `lua/claudinho/types.lua`: provider, split, cwd and `auto_start` fields and aliases dropped (`ClaudinhoTerminalConfig` keeps `auto_insert` and `fix_streamed_paste`); `state.removed_found`.
+  - Deleted: `lua/claudinho/cwd.lua`, `tests/unit/cwd_spec.lua` (5 cases), rule 95.
+  - Tests (before -> after): `tests/unit/config_spec.lua` 30 -> 27 (the 3 `external_terminal_cmd` cases); `tests/config_test.lua` 5 -> 5; `tests/unit/removed_options_spec.lua` 29 -> 67 (16 new keys x 2, `notify` gating and found rows +4, `init.setup` +2); `tests/unit/health_spec.lua` 15 -> 17; `tests/unit/diff_auto_resize_events_spec.lua` 16 -> 21 (+2 layout, +3 fixed-width `wincmd =`); `tests/unit/diff_split_width_spec.lua` 6 -> 6 (`window.right.*`); `tests/integration/removed_options_spec.lua` 1 -> 2 (no warning without `notify`, found rows kept); `tests/integration/diff_window_choice_spec.lua` 14 -> 15 (bottom layout: Claude below the diff at full width); `tests/integration/diff_window_sizes_spec.lua` 24 -> 24. Stale `terminal` config values replaced, same counts: unit `diff_inline`, `diff_inline_quit`, `diff_keep_terminal_focus_float`, `diff_new_tab_insert_mode`, `diff_new_tab_terminal_handler`, `diff_inline_new_tab`, `diff_hide_terminal_new_tab`; integration `diff_accept_emptied_buffer`, `diff_accept_missing_final_newline`, `diff_accept_trailing_newlines`, `diff_close_save`, `diff_left_window`, `diff_quit_reject`, `diff_routing`.
+  - `CHANGELOG.md`: Unreleased Changed (diff sizes, removed-key warnings, cwd) and Removed (keys, cwd module).
+- **Decisions:**
+  - Task 12 hand-off closed: the `winfixwidth = false` workaround in `diff_window_choice_spec` is gone (the case now asserts the Claude window keeps `winfixwidth`), and its assertion (diff at least `floor(columns/3) - 1`) is unchanged; the code fix is the `wincmd =` after sizing a fixed-width Claude window. The spec gives no widths; this is the agent's decision, to confirm with the user.
+  - The removed-key notice uses `vim.notify_once` (title Claudinho, WARN), not `notify.info`, because `config.notify` is not applied yet at that point; it shows only with `notify = true`.
+  - `terminal.provider` is one row without value; `snacks_win_opts` and the Phase 0 rows stay.
+  - The new-tab terminal split follows `window.layout` only for `bottom` (horizontal below); `right`, `float` and `tab` use the vertical right split. Only `right` gets the diff resize.
+  - `diff.setup` still accepts partial configs: a missing `window` means layout `right`, width 0.30.
+  - The specs assert the exact messages of spec section 4.
+  - Checks (test-runner): `check` 0 warnings / 0 errors in 208 files; `format-check` green; `unit` (`BUSTED_SEED=12345 CI=true`) 1882 / 0 / 0 / 34 (643 s; +37: -5 cwd, -3 config, +38 removed_options, +2 health, +5 auto_resize); `integration` (Neovim 0.12.3 through `mise exec`) 36 files, 572 passed (+2), plus only the known `claude_stub_spec` failure; `rg -n 'git_repo_cwd|cwd_provider' lua plugin` finds only the removed-key rows in `config.lua:137-154`.
+- **Assumptions:** the `float` and `tab` layouts also get the vertical-right split in a new diff tab and no width resize ("only right" read literally); health shows the warning text without the `[Claudinho] ` prefix.
+- **Approved scope:** none.
+- **Migrations / env vars:** none.
+- **Docs pending:** `README.md` and `README.en.md` (Task 17): removed terminal and directory keys with replacements, `window.right.width`/`diff_width`, "new tabs start in `:pwd`", the `notify` gating of the removed-key warnings, health lines. `ARCHITECTURE.md` and `CLAUDE.md` (Tasks 18 and 20): `cwd.lua` removed; the diff resizes only the `right` layout and equalizes after sizing a fixed-width window; `state.removed_found`.
+- **Manual checks:**
+  - `setup({ notify = true, terminal = { provider = "snacks", split_side = "left" }, cwd = "/tmp" })`: one `[Claudinho]` warning per key on the first setup, none on a second `setup()`; without `notify = true`, none.
+  - `:checkhealth claudinho` with those keys: one WARN per key, with the "was removed and is ignored" text.
+  - Layout `right`, a diff in the current tab with Claude as the only window (160+ columns): Claude gets `window.right.width` and the two diff windows are about equal; with `window.right.diff_width = 0.2` Claude shrinks to 20% while the diff is open and returns after accept or reject.
+  - Layout `bottom`: the diff does not resize Claude; with `open_in_new_tab = true` Claude sits below the diff in the new tab at full width.
+  - Layouts `float` and `tab`: a diff opens as before (the float hides while a diff is open).
+  - A tab started after `:cd` elsewhere uses the new `:pwd`.
+- **Out of scope:** `tests/minimal_init.lua:73` still passes the removed `auto_start = false` (harmless, warns only with `notify`) and `tests/selection_test.lua:2982` has a comment about `terminal.provider = "none"`; unit mocks in `send_command_spec`, `focus_after_send_spec`, `send_complete_event_spec`, `add_command_spec`, `tree_send_visual_spec`, `tree_buffer_classification_spec` and `conflict_spec` stub `without_removed_options` with one return value and `auto_start` (they pass but do not mirror the `(config, found)` signature). To the backlog.

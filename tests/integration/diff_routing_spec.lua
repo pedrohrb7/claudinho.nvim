@@ -58,7 +58,7 @@ describe("diff routing by tab", function()
     package.loaded["claudinho.sessions"] = nil
     sessions = require("claudinho.sessions")
     require("claudinho.tools.init").register_all()
-    diff.setup({ terminal = { provider = "none" }, diff_opts = { layout = "horizontal" } })
+    diff.setup({ diff_opts = { layout = "horizontal" } })
 
     first = assert(sessions.new())
     second = assert(sessions.new())

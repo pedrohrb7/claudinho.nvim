@@ -170,7 +170,7 @@ describe("Config module", function()
     assert(type(config.defaults.port_range) == "table")
     assert(type(config.defaults.port_range.min) == "number")
     assert(type(config.defaults.port_range.max) == "number")
-    assert(type(config.defaults.auto_start) == "boolean")
+    assert(config.defaults.auto_start == nil)
     assert(type(config.defaults.log_level) == "string")
     assert(type(config.defaults.track_selection) == "boolean")
   end)
@@ -197,13 +197,13 @@ describe("Config module", function()
 
   it("should merge user config with defaults", function()
     local user_config = {
-      auto_start = true,
+      focus_after_send = true,
       log_level = "debug",
     }
 
     local merged_config = config.apply(user_config)
 
-    assert(merged_config.auto_start == true)
+    assert(merged_config.focus_after_send == true)
     assert("debug" == merged_config.log_level)
     assert(config.defaults.port_range.min == merged_config.port_range.min)
     assert(config.defaults.track_selection == merged_config.track_selection)

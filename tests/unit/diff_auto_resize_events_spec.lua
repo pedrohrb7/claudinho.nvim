@@ -48,7 +48,7 @@ describe("resize_terminal_for_diff gating", function()
       calls[#calls + 1] = { win = w, width = width }
     end
 
-    diff.setup({ terminal = opts.terminal or {}, diff_opts = opts.diff_opts or {} })
+    diff.setup({ window = opts.window or {}, diff_opts = opts.diff_opts or {} })
     diff._resize_terminal_for_diff(opts.win or 4242, opts.when or "diff")
 
     vim.api.nvim_win_is_valid = saved.valid
@@ -60,7 +60,7 @@ describe("resize_terminal_for_diff gating", function()
 
   it("resizes a split terminal to the diff width when enabled", function()
     local calls = capture_resize({
-      terminal = { split_width_percentage = 0.5, diff_split_width_percentage = 0.2 },
+      window = { right = { width = 0.5, diff_width = 0.2 } },
       diff_opts = { auto_resize_terminal = true },
       when = "diff",
     })
@@ -70,7 +70,7 @@ describe("resize_terminal_for_diff gating", function()
 
   it("restores to the idle width when phase is idle", function()
     local calls = capture_resize({
-      terminal = { split_width_percentage = 0.5, diff_split_width_percentage = 0.2 },
+      window = { right = { width = 0.5, diff_width = 0.2 } },
       diff_opts = { auto_resize_terminal = true },
       when = "idle",
     })
@@ -80,7 +80,7 @@ describe("resize_terminal_for_diff gating", function()
 
   it("does NOT resize when auto_resize_terminal is false", function()
     local calls = capture_resize({
-      terminal = { split_width_percentage = 0.5, diff_split_width_percentage = 0.2 },
+      window = { right = { width = 0.5, diff_width = 0.2 } },
       diff_opts = { auto_resize_terminal = false },
       when = "diff",
     })
@@ -89,12 +89,97 @@ describe("resize_terminal_for_diff gating", function()
 
   it("does NOT resize a floating terminal window", function()
     local calls = capture_resize({
-      terminal = { split_width_percentage = 0.5, diff_split_width_percentage = 0.2 },
+      window = { right = { width = 0.5, diff_width = 0.2 } },
       diff_opts = { auto_resize_terminal = true },
       floating = true,
       when = "diff",
     })
     assert.are.equal(0, #calls)
+  end)
+
+  it("does NOT resize when window.layout is bottom, float or tab", function()
+    for _, layout in ipairs({ "bottom", "float", "tab" }) do
+      local calls = capture_resize({
+        window = { layout = layout, right = { width = 0.5, diff_width = 0.2 } },
+        diff_opts = { auto_resize_terminal = true },
+        when = "diff",
+      })
+      assert.are.equal(0, #calls, layout)
+    end
+  end)
+
+  it("resizes when window.layout is right", function()
+    local calls = capture_resize({
+      window = { layout = "right", right = { width = 0.5, diff_width = 0.2 } },
+      diff_opts = { auto_resize_terminal = true },
+      when = "diff",
+    })
+    assert.are.equal(1, #calls)
+  end)
+
+  describe("a Claude window of fixed width", function()
+    local saved, commands
+
+    before_each(function()
+      saved = {
+        valid = vim.api.nvim_win_is_valid,
+        cfg = vim.api.nvim_win_get_config,
+        setw = vim.api.nvim_win_set_width,
+        opt = vim.api.nvim_get_option_value,
+        tabpage = vim.api.nvim_win_get_tabpage,
+        current = vim.api.nvim_get_current_tabpage,
+        cmd = vim.cmd,
+      }
+      commands = {}
+      vim.api.nvim_win_is_valid = function()
+        return true
+      end
+      vim.api.nvim_win_get_config = function()
+        return { relative = "" }
+      end
+      vim.api.nvim_win_set_width = function() end
+      vim.api.nvim_get_option_value = function(name)
+        return name == "winfixwidth"
+      end
+      vim.api.nvim_win_get_tabpage = function()
+        return 7
+      end
+      vim.api.nvim_get_current_tabpage = function()
+        return 7
+      end
+      vim.cmd = function(command)
+        commands[#commands + 1] = command
+      end
+      diff.setup({ window = { right = { width = 0.5, diff_width = 0.2 } }, diff_opts = {} })
+    end)
+
+    after_each(function()
+      vim.api.nvim_win_is_valid = saved.valid
+      vim.api.nvim_win_get_config = saved.cfg
+      vim.api.nvim_win_set_width = saved.setw
+      vim.api.nvim_get_option_value = saved.opt
+      vim.api.nvim_win_get_tabpage = saved.tabpage
+      vim.api.nvim_get_current_tabpage = saved.current
+      vim.cmd = saved.cmd
+    end)
+
+    it("equalizes the other windows after the diff width, so the diff windows share the rest", function()
+      diff._resize_terminal_for_diff(4242, "diff")
+      assert.are.same({ "wincmd =" }, commands)
+    end)
+
+    it("leaves the other windows alone when the diff ends", function()
+      diff._resize_terminal_for_diff(4242, "idle")
+      assert.are.same({}, commands)
+    end)
+
+    it("leaves the windows of another tab alone", function()
+      vim.api.nvim_win_get_tabpage = function()
+        return 8
+      end
+      diff._resize_terminal_for_diff(4242, "diff")
+      assert.are.same({}, commands)
+    end)
   end)
 
   it("does NOT resize an invalid window", function()

@@ -13,7 +13,6 @@ describe("closing and saving a proposed diff", function()
 
   local function open_diff(layout, file, diff_opts)
     diff.setup({
-      terminal = { provider = "none" },
       diff_opts = vim.tbl_extend("force", { layout = layout }, diff_opts or {}),
     })
     local call = tools.handle_invoke({ id = "close_save_spec" }, {

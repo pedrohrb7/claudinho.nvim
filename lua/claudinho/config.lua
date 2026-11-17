@@ -9,7 +9,6 @@ local M = {}
 ---@type ClaudinhoConfig
 M.defaults = {
   port_range = { min = 10000, max = 65535 },
-  auto_start = true,
   terminal_cmd = nil,
   env = {}, -- Custom environment variables for Claude terminal
   log_level = "info",
@@ -52,15 +51,9 @@ M.defaults = {
   },
   keymaps = { preset = false },
   notify = false, -- informative notifications (errors and replies always show)
-  -- Keep a minimal terminal config here instead of requiring claudinho.terminal
-  -- during config.apply(). Loading the terminal module pulls in the server/main
-  -- module graph and makes coverage-enabled config validation unexpectedly slow.
-  terminal = {
-    provider = "auto",
-    provider_opts = {
-      external_terminal_cmd = nil,
-    },
-  },
+  -- `auto_insert` and `fix_streamed_paste` are read as they come: absent means the behavior of today (`auto_insert`
+  -- on, `fix_streamed_paste = "auto"`). Kept here instead of requiring claudinho.terminal during config.apply().
+  terminal = {},
 }
 
 ---@class ClaudinhoRemovedOption
@@ -98,9 +91,67 @@ M.removed_options = {
   },
   {
     path = { "terminal", "provider" },
-    value = "snacks",
-    replace_with = "native",
-    message = '[Claudinho] terminal.provider = "snacks" was removed. Using the native terminal.',
+    message = "[Claudinho] terminal.provider was removed and is ignored. Claude always runs in Neovim's terminal, in the window set by window.layout.",
+  },
+  {
+    path = { "terminal", "provider_opts" },
+    message = "[Claudinho] terminal.provider_opts was removed and is ignored. External terminals are no longer supported.",
+  },
+  {
+    path = { "terminal", "external_terminal_cmd" },
+    message = "[Claudinho] terminal.external_terminal_cmd was removed and is ignored. External terminals are no longer supported.",
+  },
+  {
+    path = { "terminal", "split_side" },
+    message = "[Claudinho] terminal.split_side was removed and is ignored. Use window.layout instead.",
+  },
+  {
+    path = { "terminal", "split_width_percentage" },
+    message = "[Claudinho] terminal.split_width_percentage was removed and is ignored. Use window.right.width instead.",
+  },
+  {
+    path = { "terminal", "diff_split_width_percentage" },
+    message = "[Claudinho] terminal.diff_split_width_percentage was removed and is ignored. Use window.right.diff_width instead.",
+  },
+  {
+    path = { "terminal", "auto_close" },
+    message = "[Claudinho] terminal.auto_close was removed and is ignored. Tabs never close by themselves; use :Claudinho tab-close.",
+  },
+  {
+    path = { "terminal", "show_native_term_exit_tip" },
+    message = "[Claudinho] terminal.show_native_term_exit_tip was removed and is ignored.",
+  },
+  {
+    path = { "auto_start" },
+    message = "[Claudinho] auto_start was removed and is ignored. Nothing starts with setup(); each tab starts its own server.",
+  },
+  {
+    path = { "terminal", "auto_start" },
+    message = "[Claudinho] terminal.auto_start was removed and is ignored. Nothing starts with setup(); each tab starts its own server.",
+  },
+  {
+    path = { "terminal", "cwd" },
+    message = "[Claudinho] terminal.cwd was removed and is ignored. New tabs start in Neovim's current directory (:pwd).",
+  },
+  {
+    path = { "terminal", "git_repo_cwd" },
+    message = "[Claudinho] terminal.git_repo_cwd was removed and is ignored. New tabs start in Neovim's current directory (:pwd).",
+  },
+  {
+    path = { "terminal", "cwd_provider" },
+    message = "[Claudinho] terminal.cwd_provider was removed and is ignored. New tabs start in Neovim's current directory (:pwd).",
+  },
+  {
+    path = { "cwd" },
+    message = "[Claudinho] cwd was removed and is ignored. New tabs start in Neovim's current directory (:pwd).",
+  },
+  {
+    path = { "git_repo_cwd" },
+    message = "[Claudinho] git_repo_cwd was removed and is ignored. New tabs start in Neovim's current directory (:pwd).",
+  },
+  {
+    path = { "cwd_provider" },
+    message = "[Claudinho] cwd_provider was removed and is ignored. New tabs start in Neovim's current directory (:pwd).",
   },
 }
 
@@ -118,19 +169,24 @@ local function copy_table(value)
   return copy
 end
 
----Returns a copy of the config without the removed options, and warns once per key and per session.
----Never changes the argument and never raises, whatever the type of the values.
+---Returns a copy of the config without the removed options, and the rows that were found in it.
+---Warns once per key and per session, only when `opts.notify` is true (the caller reads it raw from the user's config,
+---before `apply`). Never changes the argument and never raises, whatever the type of the values.
 ---@param user_config table|nil
----@return table
-function M.without_removed_options(user_config)
+---@param opts { notify: boolean? }|nil
+---@return table config
+---@return ClaudinhoRemovedOption[] found The rows of the removed keys the user's config has, in table order
+function M.without_removed_options(user_config, opts)
   if type(user_config) ~= "table" then
-    return user_config or {}
+    return user_config or {}, {}
   end
+  local warn = type(opts) == "table" and opts.notify == true
 
   local result = copy_table(user_config)
   result.diff_opts = copy_table(user_config.diff_opts)
   result.terminal = copy_table(user_config.terminal)
 
+  local found = {}
   for _, row in ipairs(M.removed_options) do
     -- Walk to the table that holds the last key of the path.
     local parent = result
@@ -142,12 +198,15 @@ function M.without_removed_options(user_config)
       local current = parent[key]
       if current ~= nil and (row.value == nil or current == row.value) then
         parent[key] = row.replace_with
-        vim.notify_once(row.message, vim.log.levels.WARN)
+        found[#found + 1] = row
+        if warn then
+          vim.notify_once(row.message, vim.log.levels.WARN, { title = "Claudinho" })
+        end
       end
     end
   end
 
-  return result
+  return result, found
 end
 
 ---Validates the provided configuration table.
@@ -165,33 +224,10 @@ function M.validate(config)
     "Invalid port range"
   )
 
-  assert(type(config.auto_start) == "boolean", "auto_start must be a boolean")
-
   assert(config.terminal_cmd == nil or type(config.terminal_cmd) == "string", "terminal_cmd must be nil or a string")
 
   -- Validate terminal config
   assert(type(config.terminal) == "table", "terminal must be a table")
-
-  -- Validate provider_opts if present
-  if config.terminal.provider_opts then
-    assert(type(config.terminal.provider_opts) == "table", "terminal.provider_opts must be a table")
-
-    -- Validate external_terminal_cmd in provider_opts
-    if config.terminal.provider_opts.external_terminal_cmd then
-      local cmd_type = type(config.terminal.provider_opts.external_terminal_cmd)
-      assert(
-        cmd_type == "string" or cmd_type == "function",
-        "terminal.provider_opts.external_terminal_cmd must be a string or function"
-      )
-      -- Only validate %s placeholder for strings
-      if cmd_type == "string" and config.terminal.provider_opts.external_terminal_cmd ~= "" then
-        assert(
-          config.terminal.provider_opts.external_terminal_cmd:find("%%s"),
-          "terminal.provider_opts.external_terminal_cmd must contain '%s' placeholder for the Claude command"
-        )
-      end
-    end
-  end
 
   local valid_log_levels = { "trace", "debug", "info", "warn", "error" }
   local is_valid_log_level = false

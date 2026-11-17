@@ -171,7 +171,11 @@ function M.setup(opts)
   end
 
   local config = require("claudinho.config")
-  opts = config.without_removed_options(opts or {})
+  opts = opts or {}
+  -- `notify` is read raw, before `apply`: the warnings of the removed keys follow the user's own `notify = true`.
+  local found
+  opts, found = config.without_removed_options(opts, { notify = opts.notify == true })
+  M.state.removed_found = found
 
   M.state.config = config.apply(opts)
   -- vim.g.claudinho_user_config is no longer needed as config values are passed directly.
@@ -272,8 +276,8 @@ function M._format_path_for_at_mention(file_path)
   end
 
   -- Send the absolute path. A path made relative to Neovim's cwd names a different file
-  -- when Claude's cwd differs (terminal.cwd, cwd_provider, git_repo_cwd, a CLI started
-  -- elsewhere) or after a :cd, and a text-prefix cwd match cut /work/foobar to "ar".
+  -- when Claude's cwd differs (a tab started before a :cd, a CLI started elsewhere) or after a :cd,
+  -- and a text-prefix cwd match cut /work/foobar to "ar".
   -- :p makes the path absolute for this platform. It reads a leading ~ as ~user, and the
   -- callers expand ~/ first, so a leading ~ here is part of a file name in the cwd.
   local input = file_path:sub(1, 1) == "~" and ("./" .. file_path) or file_path

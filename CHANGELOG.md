@@ -18,12 +18,17 @@ Claudinho.nvim is a hard fork of [claudecode.nvim](https://github.com/coder/clau
 - `terminal.lua` is now a facade over the active tab (`setup`, `get_active_terminal_bufnr`, `ensure_visible`, `open`, `send_to_terminal`).
 - The log context of the send commands is now `Claudinho send`, `Claudinho add` and so on (it was `ClaudeCodeSend`, `ClaudeCodeAdd`...), also in the `context` field of `User ClaudinhoSendComplete`.
 - `keymaps = { preset = true }` maps the `<leader>a*` keys to the subcommands (20 keys; `<leader>as` in Visual mode). A key that is already mapped is left alone, with a notice when `notify = true`. Nothing is mapped by default.
+- A diff reads the Claude window's size from `window.right.width` and `window.right.diff_width` (they replace `terminal.split_width_percentage` and `terminal.diff_split_width_percentage`). Only the `right` layout is resized while a diff is open; the Claude window has a fixed width, so the other windows of the tab share the rest equally, and the diff keeps at least a third of the screen. A diff that opens in a new tab puts the Claude window to the right, or below with `window.layout = "bottom"`.
+- Removed config keys warn only with `notify = true` (read as given, before the config is merged), and `:checkhealth claudinho` lists each one the config still has. `terminal.provider` is a removed key with any value (`"snacks"` no longer becomes `"native"`).
+- New tabs always start in Neovim's current directory (`:pwd`).
 
 ### Removed
 
 - The `:ClaudeCode`, `:ClaudeCodeStart`, `:ClaudeCodeStop`, `:ClaudeCodeStatus`, `:ClaudeCodeSend`, `:ClaudeCodeTreeAdd`, `:ClaudeCodeAdd`, `:ClaudeCodeFocus`, `:ClaudeCodeOpen`, `:ClaudeCodeClose`, `:ClaudeCodeSendText`, `:ClaudeCodeDiffAccept`, `:ClaudeCodeDiffDeny`, `:ClaudeCodeCloseAllDiffs` and `:ClaudeCodeSelectModel` commands. Use the `:Claudinho` subcommands.
 - The `native`, `external` and `none` terminal providers and custom table providers: Claude always runs in a Neovim terminal, in the Claude window. The extra arguments for `claude` in the old commands (`:ClaudeCode --resume`) are gone too.
 - `require("claudinho").start()`, `.stop()`, `.default_queue()` and `.process_mention_queue()`, the `ClaudinhoShutdown` autocmd and the plugin-wide server state (`state.server`, `state.port`, `state.auth_token`).
+- Config keys, each ignored and reported as removed: `terminal.provider`, `terminal.provider_opts`, `terminal.external_terminal_cmd`, `terminal.split_side` (use `window.layout`), `terminal.split_width_percentage` (use `window.right.width`), `terminal.diff_split_width_percentage` (use `window.right.diff_width`), `terminal.auto_close`, `terminal.show_native_term_exit_tip`, `auto_start` and `terminal.auto_start`.
+- The working-directory options `cwd`, `git_repo_cwd`, `cwd_provider` and their `terminal.*` forms, and the `claudinho.cwd` module.
 
 ## [0.1.0] - 2026-11-15
 

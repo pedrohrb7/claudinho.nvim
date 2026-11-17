@@ -75,6 +75,15 @@ local function check_notify(config)
   end
 end
 
+---One WARN per removed key that the user's config still has (found by the last `setup()`), with the text of the
+---warning that `notify = true` shows.
+---@param claudinho table The main plugin module
+local function check_removed_options(claudinho)
+  for _, row in ipairs(claudinho.state.removed_found or {}) do
+    warn((row.message:gsub("^%[Claudinho%] ", "")))
+  end
+end
+
 ---The lock file of a running tab: present, or why it is not.
 ---@param n integer The tab number
 ---@param port integer
@@ -154,6 +163,7 @@ function M.check()
 
   check_cli(claudinho.state.config)
   check_notify(claudinho.state.config)
+  check_removed_options(claudinho)
   check_tabs()
 end
 

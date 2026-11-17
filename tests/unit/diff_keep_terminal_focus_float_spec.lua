@@ -58,7 +58,7 @@ describe("Diff keep_terminal_focus with floating terminal", function()
 
     -- Provide minimal config directly to diff module
     diff.setup({
-      terminal = { split_side = "right", split_width_percentage = 0.30 },
+      window = { layout = "right", right = { width = 0.30 } },
       diff_opts = {
         layout = "vertical",
         open_in_new_tab = false,

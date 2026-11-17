@@ -835,7 +835,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `lua/claudinho/config.lua`, `lua/claudinho/init.lua`, `lua/claudinho/diff.lua`, `lua/claudinho/terminal.lua`, `lua/claudinho/health.lua`, `lua/claudinho/types.lua`, `lua/claudinho/cwd.lua`, `tests/unit/config_spec.lua`, `tests/config_test.lua`, `tests/unit/removed_options_spec.lua`, `tests/integration/removed_options_spec.lua`, `tests/unit/health_spec.lua`, `tests/unit/cwd_spec.lua`, `tests/unit/init_spec.lua`, `tests/unit/diff_*_spec.lua`, `tests/integration/diff_*_spec.lua`, `fixtures/netrw/lua/plugins/dev-claudinho.lua`, `fixtures/nvim-tree/lua/plugins/dev-claudinho.lua`, `fixtures/oil/lua/plugins/dev-claudinho.lua`, `fixtures/mini-files/lua/plugins/dev-claudinho.lua`, `fixtures/repro/**`, `CHANGELOG.md`
 - **Depends on:** Task 12
 - **Done when:** a tabela de chaves removidas da seção 4 está aplicada, com as seis chaves de diretório (regras 93 e 94), o aviso só sai com `notify`, o health mostra cada chave; `diff.lua` lê `config.window`; `cwd.lua` e `tests/unit/cwd_spec.lua` não existem (regra 95) e `rg -n 'git_repo_cwd|cwd_provider' lua plugin` só acha as linhas de chave removida em `config.lua`; os specs listados passam; entradas no `## [Unreleased]`; gate verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 14 - claudecode.nvim vira aviso
 

@@ -17,7 +17,7 @@ describe("Unified diff in new tab", function()
 
   local function setup_config(hide_terminal_in_new_tab)
     diff.setup({
-      terminal = { split_side = "right", split_width_percentage = 0.30 },
+      window = { layout = "right", right = { width = 0.30 } },
       diff_opts = {
         layout = "unified",
         open_in_new_tab = true,

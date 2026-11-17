@@ -20,7 +20,6 @@ describe("Configuration", function()
   it("should have default configuration", function()
     expect(config.defaults).to_be_table()
     expect(config.defaults).to_have_key("port_range")
-    expect(config.defaults).to_have_key("auto_start")
     expect(config.defaults).to_have_key("log_level")
     expect(config.defaults).to_have_key("track_selection")
     expect(config.defaults).to_have_key("models")
@@ -50,17 +49,18 @@ describe("Configuration", function()
   it("should not load terminal module while applying configuration", function()
     package.loaded["claudinho.terminal"] = nil
 
-    local final_config = config.apply({ auto_start = false, log_level = "info" })
+    local final_config = config.apply({ log_level = "info" })
 
     expect(final_config.terminal).to_be_table()
-    expect(final_config.terminal.provider).to_be("auto")
+    expect(final_config.terminal.provider).to_be_nil()
+    expect(final_config.terminal.provider_opts).to_be_nil()
+    expect(final_config.auto_start).to_be_nil()
     expect(package.loaded["claudinho.terminal"]).to_be_nil()
   end)
 
   it("should reject invalid port range", function()
     local invalid_config = {
       port_range = { min = -1, max = 65536 },
-      auto_start = true,
       log_level = "debug",
       track_selection = false,
     }
@@ -75,7 +75,6 @@ describe("Configuration", function()
   it("should reject invalid log level", function()
     local invalid_config = {
       port_range = { min = 10000, max = 65535 },
-      auto_start = true,
       log_level = "invalid_level",
       track_selection = false,
     }
@@ -90,7 +89,6 @@ describe("Configuration", function()
   it("should reject invalid models configuration", function()
     local invalid_config = {
       port_range = { min = 10000, max = 65535 },
-      auto_start = true,
       log_level = "debug",
       track_selection = false,
       visual_demotion_delay_ms = 50,
@@ -112,7 +110,6 @@ describe("Configuration", function()
   it("should reject models with invalid structure", function()
     local invalid_config = {
       port_range = { min = 10000, max = 65535 },
-      auto_start = true,
       log_level = "debug",
       track_selection = false,
       visual_demotion_delay_ms = 50,
@@ -135,13 +132,11 @@ describe("Configuration", function()
 
   it("should merge user config with defaults", function()
     local user_config = {
-      auto_start = true,
       log_level = "debug",
     }
 
     local merged_config = config.apply(user_config)
 
-    expect(merged_config.auto_start).to_be_true()
     expect(merged_config.log_level).to_be("debug")
     expect(merged_config.port_range.min).to_be(config.defaults.port_range.min)
     expect(merged_config.track_selection).to_be(config.defaults.track_selection)
@@ -151,7 +146,6 @@ describe("Configuration", function()
   it("should accept valid keep_terminal_focus configuration", function()
     local user_config = {
       port_range = { min = 10000, max = 65535 },
-      auto_start = true,
       log_level = "info",
       track_selection = true,
       visual_demotion_delay_ms = 50,
@@ -175,7 +169,6 @@ describe("Configuration", function()
   it("should reject invalid keep_terminal_focus configuration", function()
     local invalid_config = {
       port_range = { min = 10000, max = 65535 },
-      auto_start = true,
       log_level = "info",
       track_selection = true,
       visual_demotion_delay_ms = 50,
@@ -202,7 +195,6 @@ describe("Configuration", function()
   it("should accept valid auto_resize_terminal configuration", function()
     local user_config = {
       port_range = { min = 10000, max = 65535 },
-      auto_start = true,
       log_level = "info",
       track_selection = true,
       visual_demotion_delay_ms = 50,
@@ -225,14 +217,13 @@ describe("Configuration", function()
   end)
 
   it("should default auto_resize_terminal to true", function()
-    local final_config = config.apply({ auto_start = true, log_level = "info" })
+    local final_config = config.apply({ log_level = "info" })
     expect(final_config.diff_opts.auto_resize_terminal).to_be_true()
   end)
 
   it("should reject invalid auto_resize_terminal configuration", function()
     local invalid_config = {
       port_range = { min = 10000, max = 65535 },
-      auto_start = true,
       log_level = "info",
       track_selection = true,
       visual_demotion_delay_ms = 50,
@@ -255,102 +246,6 @@ describe("Configuration", function()
     end)
 
     expect(success).to_be_false()
-  end)
-
-  it("should accept function for external_terminal_cmd", function()
-    local valid_config = {
-      port_range = { min = 10000, max = 65535 },
-      auto_start = true,
-      log_level = "info",
-      track_selection = true,
-      visual_demotion_delay_ms = 50,
-      connection_wait_delay = 200,
-      connection_timeout = 10000,
-      diff_opts = {
-        layout = "vertical",
-      },
-      env = {},
-      models = {
-        { name = "Test Model", value = "test" },
-      },
-      terminal = {
-        provider = "external",
-        provider_opts = {
-          external_terminal_cmd = function(cmd, env)
-            return "terminal " .. cmd
-          end,
-        },
-      },
-    }
-
-    local success, _ = pcall(function()
-      config.validate(valid_config)
-    end)
-
-    expect(success).to_be_true()
-  end)
-
-  it("should accept string for external_terminal_cmd", function()
-    local valid_config = {
-      port_range = { min = 10000, max = 65535 },
-      auto_start = true,
-      log_level = "info",
-      track_selection = true,
-      visual_demotion_delay_ms = 50,
-      connection_wait_delay = 200,
-      connection_timeout = 10000,
-      diff_opts = {
-        layout = "vertical",
-      },
-      env = {},
-      models = {
-        { name = "Test Model", value = "test" },
-      },
-      terminal = {
-        provider = "external",
-        provider_opts = {
-          external_terminal_cmd = "alacritty -e %s",
-        },
-      },
-    }
-
-    local success, _ = pcall(function()
-      config.validate(valid_config)
-    end)
-
-    expect(success).to_be_true()
-  end)
-
-  it("should reject invalid type for external_terminal_cmd", function()
-    local invalid_config = {
-      port_range = { min = 10000, max = 65535 },
-      auto_start = true,
-      log_level = "info",
-      track_selection = true,
-      visual_demotion_delay_ms = 50,
-      connection_wait_delay = 200,
-      connection_timeout = 10000,
-      diff_opts = {
-        layout = "vertical",
-      },
-      env = {},
-      models = {
-        { name = "Test Model", value = "test" },
-      },
-      terminal = {
-        provider = "external",
-        provider_opts = {
-          external_terminal_cmd = 123, -- Invalid: number
-        },
-      },
-    }
-
-    local success, err = pcall(function()
-      config.validate(invalid_config)
-    end)
-
-    expect(success).to_be_false()
-    expect(tostring(err)).to_match("must be a string or function")
   end)
 
   describe("new keys (window, keymaps, notify)", function()

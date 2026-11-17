@@ -93,7 +93,8 @@ describe("Diff in a new tab: the terminal's auto-enter handler", function()
     describe("with layout = " .. layout, function()
       local function setup_diff(auto_insert)
         diff.setup({
-          terminal = { split_side = "right", split_width_percentage = 0.30, auto_insert = auto_insert },
+          window = { layout = "right", right = { width = 0.30 } },
+          terminal = { auto_insert = auto_insert },
           diff_opts = {
             layout = layout,
             open_in_new_tab = true,

@@ -244,6 +244,30 @@ describe("health", function()
     expect(has_report("error", "Terminal provider")).to_be_false()
   end)
 
+  it("warns for each removed key the config still has, with the text of the setup warning", function()
+    local config = require("claudinho.config")
+    fake_state.removed_found = {}
+    for _, row in ipairs(config.removed_options) do
+      if row.path[#row.path] == "split_side" or row.path[1] == "cwd" then
+        fake_state.removed_found[#fake_state.removed_found + 1] = row
+      end
+    end
+
+    health.check()
+
+    expect(has_report("warn", "^terminal%.split_side was removed and is ignored%. Use window%.layout instead%.$")).to_be_true()
+    expect(has_report("warn", "^cwd was removed and is ignored%. New tabs start in Neovim's current directory")).to_be_true()
+    expect(has_report("warn", "%[Claudinho%]")).to_be_false()
+  end)
+
+  it("warns about no removed key when setup found none", function()
+    fake_state.removed_found = {}
+
+    health.check()
+
+    expect(has_report("warn", "was removed")).to_be_false()
+  end)
+
   describe("Neovim version", function()
     local real_has
 

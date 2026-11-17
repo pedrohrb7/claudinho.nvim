@@ -22,7 +22,7 @@ describe("the text a diff accepts after the user empties the proposal", function
     handle:write("old\n")
     handle:close()
     vim.cmd("edit " .. vim.fn.fnameescape(file))
-    diff.setup({ terminal = { provider = "none" }, diff_opts = { layout = layout } })
+    diff.setup({ diff_opts = { layout = layout } })
     local call = tools.handle_invoke({ id = "emptied_spec" }, {
       name = "openDiff",
       arguments = { old_file_path = file, new_file_path = file, new_file_contents = new_text, tab_name = tab },

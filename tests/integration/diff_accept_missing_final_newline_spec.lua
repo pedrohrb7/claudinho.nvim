@@ -23,7 +23,7 @@ describe("the text a proposed diff accepts, by how the proposal ends", function(
       handle:close()
       vim.cmd("edit " .. vim.fn.fnameescape(file))
     end
-    diff.setup({ terminal = { provider = "none" }, diff_opts = { layout = layout } })
+    diff.setup({ diff_opts = { layout = layout } })
     local call = tools.handle_invoke({ id = "ending_spec" }, {
       name = "openDiff",
       arguments = { old_file_path = file, new_file_path = file, new_file_contents = new_text, tab_name = tab },
