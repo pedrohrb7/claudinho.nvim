@@ -10,6 +10,9 @@ Planned refactors that aren't urgent bugs but are worth doing deliberately, one 
 
 ## Index
 
-| Entry                                                                                                               | Status   |
-| ------------------------------------------------------------------------------------------------------------------- | -------- |
-| [ClaudinhoSendCompleteData doc comment: stale README section and tag](2026-11-15-types-sendcomplete-doc-comment.md) | Proposed |
+| Entry                                                                                                                                          | Status   |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| [ClaudinhoSendCompleteData doc comment: stale README section and tag](2026-11-15-types-sendcomplete-doc-comment.md)                            | Proposed |
+| [Em dash in pre-existing Lua comments](2026-11-17-em-dash-in-lua-comments.md)                                                                  | Proposed |
+| [Leftovers of removed options in test setup and comments](2026-11-17-stale-removed-option-leftovers-in-tests.md)                               | Proposed |
+| [Unit mocks of config.without_removed_options out of sync with the real signature](2026-11-17-unit-mocks-without-removed-options-signature.md) | Proposed |
