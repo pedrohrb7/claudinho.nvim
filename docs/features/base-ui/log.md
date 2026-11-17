@@ -227,3 +227,41 @@ Mode: `--step`, same gate policy as the 2026-11-15 run. The run state `.claude/r
 - **Docs pending:** `ARCHITECTURE.md` (Task 20): the `sessions.lua` registry, active tab, router, `setup_autocmds` (`ExitPre` then `VimLeavePre`), `for_client` through `server.id`, the `window.show/close/refresh` contract. `CLAUDE.md` (Task 18): `sessions.lua` in the structure list. `CHANGELOG.md` Unreleased (Task 19): internal tab registry; `selection.resend_latest`.
 - **Manual checks (Task 10):** tab switching, redraw on `on_change`/`on_exit`, and a buffer wipe of a visible tab in a real window.
 - **Out of scope:** luacheck on the file alone warns about an unused `context` argument at `tests/selection_test.lua:1041` (pre-existing; the project `check` is clean).
+
+### Task 10 - Janela do Claude: layouts, winbar e statusline (done)
+
+- **Files:**
+  - New `lua/claudinho/ui/window.lua` (origin line first, upstream `lua/claudecode/terminal/native.lua`): layouts `right`, `bottom`, `float`, `tab` (invalid falls back to `right`); `show`, `hide`, `close`, `toggle`, `open`, `focus`, `ensure_visible`, `refresh`, `release`, `unlock`, `resize`, `update_title`, `setup`, `teardown`; pure `geometry()`.
+  - `lua/claudinho/ui/tabbar.lua`: `render()` with no arguments reads the sessions registry, the drawn window's width (`vim.g.statusline_winid`) and `window.tab_title_max`; the pure path is unchanged.
+  - `lua/claudinho/ui/status.lua`: `render()` = `text(sessions.active().data)`.
+  - `lua/claudinho/sessions.lua`: `close()` calls `window.release(buf, neighbour buf)` before `session.close`; `restart()` calls `window.unlock()` first and redraws on failure; `kill_all()` calls `window.release` for the active buffer before closing the sessions (the `window.close` order is kept).
+  - `lua/claudinho/types.lua`: `ClaudinhoWindowState`.
+  - Tests: new `tests/unit/ui/window_geometry_spec.lua` (16: right, bottom, float centered with tabline/statusline/cmdheight, tab, unknown layout); `tests/unit/ui/status_spec.lua` (+2, `render`); new `tests/integration/window_spec.lua` (33, real Neovim: four layouts, toggle/open/hide/focus, `:q`, `<C-w>c`, `:tabclose`, tab switch, close, restart, title by OSC, `gt`, float and diff, `:q` on the last window in a child Neovim).
+- **Decisions:**
+  - Winbar and statusline are `%!v:lua.require'claudinho.ui.tabbar'.render()` and `%!v:lua.require'claudinho.ui.status'.render()`.
+  - Splits open with `nvim_open_win({ split = "right"|"below", win = -1 })` (botright, focus unchanged). The tab layout uses `tabnew`, and its empty buffer is wiped (`bufhidden=wipe`).
+  - Visibility is `nvim_win_is_valid(state.win)`; no `WinClosed` autocmd: a closed window is a hidden one, and the session stays.
+  - `window.setup()` is idempotent and called lazily by `show()` and `refresh()` (so `TermRequest` is registered before the first title). It installs the click handler, links the highlights and registers `ColorScheme`, `VimResized`, `QuitPre`, `User ClaudinhoDiffOpened` and `TermRequest` in group `ClaudinhoWindow`; `teardown()` undoes it.
+  - `winfixbuf` is on after every buffer set and off only during the plugin's own swap. `window.unlock()` serves `sessions.restart` (whose `set_buf` would otherwise be refused); `window.release()` frees the window before a buffer is deleted (tab close, `kill_all`).
+  - `hide()` and `close()` open an empty tab first when the Claude window is the only non-float window of the only Neovim tab, so hiding never exits Neovim. In the `tab` layout, `hide` closes the Neovim tab.
+  - `toggle`: window in the current Neovim tab means hide, otherwise show with focus (a window elsewhere moves here). `focus`: focused means hide, otherwise show with focus.
+  - `ensure_visible()` does nothing while `hidden_by_diff` or when visible; otherwise shows without focus. Task 12/13 must point the diff's `ensure_visible` call at it.
+  - Float: no border and no `style=minimal` (spec text); size from the editor area (`lines - cmdheight - tabline - statusline`). `right` and `bottom` use `floor(columns|lines * fraction)`. `diff_width` is not handled here (Task 13).
+  - `startinsert` only with focus, a running session and `terminal.auto_insert ~= false`; the integration spec records `vim.cmd("startinsert")` calls instead of reading the mode (it takes effect after returning to the main loop).
+  - `sessions.activate` still does not show the window; it redraws, and `refresh()` swaps the buffer and the status.
+  - `nvim__redraw` in `pcall`, with a `redrawstatus!` fallback.
+  - Checks (test-runner): `check` 0 warnings / 0 errors in 214 files; `format-check` green (0 changed); `unit` (`BUSTED_SEED=12345 CI=true`) 1927 / 0 / 0 / 34 (644 s; +18, +1 pending); `integration` (Neovim 0.12.3 through `mise exec`) 36 files, 574 passed, 1 failed: only the known `claude_stub_spec` bug.
+  - Process note: while debugging, the agent ran a `mise exec` with `HOME=/tmp`, which left `/tmp/.local` and `/tmp/.cache` behind (cleanup left to the user).
+- **Assumptions:** `toggle` from another Neovim tab (window visible elsewhere) brings the window to the current tab instead of hiding it; the float's height and its own winbar/statusline rows come from the editor area; the "key typed in an ended terminal" integration case only proves that `show(focus)` does not call `startinsert` for an exited tab (the real key behavior stays a manual check).
+- **Approved scope:** none.
+- **Migrations / env vars:** none.
+- **Docs pending:** `ARCHITECTURE.md` (Task 20): `ui/window.lua` (layouts, state `{ win, tabpage, hidden_by_diff }`, the `show/hide/close/release/unlock/refresh` contract with sessions), the `TermRequest` title flow, `QuitPre`, `ClaudinhoDiffOpened` for the float, `winfixbuf`. `CLAUDE.md` (Task 18): `ui/window.lua`. `README.md` and `README.en.md` (Task 17): layouts, winbar, statusline, the `laststatus=3` and `laststatus=0` limitation, float without border. `CHANGELOG.md` Unreleased (Task 19): the Claude window with four layouts, tab bar in the winbar, status in the statusline.
+- **Manual checks:**
+  - Each `window.layout` (`right`, `bottom`, `float`, `tab`) through `:lua require('claudinho.sessions').new()` (until Task 12), then resize the terminal: the float stays centered at 80% with its statusline; light and dark colorschemes; `laststatus=3` (statusline only while focused) and `laststatus=0` (never).
+  - Winbar: left click on a tab and on `+`; right and middle clicks ignored; `:set mouse=` disables clicks; shrink until titles become numbers and then `‹ ›` appear, keeping the active tab and `+`; a window narrower than the active tab plus `+`; a CJK title.
+  - Colors: groups link to `TabLineSel`, `TabLine`, `WarningMsg`, `Comment`, `TabLineFill`, also after `:colorscheme <other>`.
+  - Title: when Claude changes its terminal title, the tab name follows in the same redraw; a generic "Claude Code" title shows `Claude <n>`.
+  - Several tabs: buffer, winbar and statusline change together; an ended tab keeps its last status and shows `[exited]`; after `/exit`, typing in the ended terminal does not enter terminal mode.
+  - `:q` and `<C-w>c` on the Claude window hide it and the process keeps running; `:bwipeout` of a visible tab's buffer is refused by `winfixbuf` (confirm this is acceptable); `gt` to another tab then open moves the window there.
+  - `:q` in the last editor window while Claude is open (`right` and `float`) leaves Neovim without a prompt and leaves no lock files in `~/.claude/ide`.
+  - Float and diff: opening a diff hides the float; open/toggle/focus bring it back.

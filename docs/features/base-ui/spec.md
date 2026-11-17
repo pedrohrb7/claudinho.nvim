@@ -811,7 +811,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `lua/claudinho/ui/window.lua`, `lua/claudinho/ui/tabbar.lua`, `lua/claudinho/ui/status.lua`, `lua/claudinho/sessions.lua`, `lua/claudinho/types.lua`, `tests/unit/ui/**`, `tests/integration/window_spec.lua`, `tests/helpers/**`, `tests/mocks/vim.lua`
 - **Depends on:** Task 9
 - **Done when:** a seção 8 está aplicada, com a linha de origem em `ui/window.lua`; `sessions.new` e `activate` usam a janela; `window_geometry_spec` e `window_spec` passam; gate verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 11 - Diff por aba
 

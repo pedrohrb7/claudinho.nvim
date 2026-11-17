@@ -1,7 +1,7 @@
 ---@brief [[
---- The tab bar (the winbar of the Claude window): labels, shrinking and click handling. Everything here is pure: the
---- tabs, the active tab, the width and the title limit come as arguments, so the window code (Task 10) owns the
---- state and calls `render`.
+--- The tab bar (the winbar of the Claude window): labels, shrinking and click handling. The layout and the string are
+--- pure: the tabs, the active tab, the width and the title limit come as arguments. Only `render` without arguments
+--- (what the winbar expression calls) reads the tab registry and the window.
 ---@brief ]]
 ---@module 'claudinho.ui.tabbar'
 local M = {}
@@ -244,13 +244,39 @@ local function escape(text)
   return (text:gsub("%%", "%%%%"))
 end
 
----Build the winbar string, with a click region per tab and for the `+`.
----@param tabs ClaudinhoTabInfo[]
+---The tabs of the registry as bar data, with the width of the window being drawn and the title limit of the config.
+---@return ClaudinhoTabInfo[] tabs
+---@return integer|nil active
+---@return integer width
+---@return integer max
+local function live()
+  local sessions = require("claudinho.sessions")
+  local tabs = {}
+  for n, s in pairs(sessions.state.tabs) do
+    tabs[#tabs + 1] = { number = n, title = s.title, diff = #s.pending_diffs > 0, exited = s.state == "exited" }
+  end
+  local plugin = package.loaded["claudinho"]
+  local config = type(plugin) == "table" and type(plugin.state) == "table" and plugin.state.config or nil
+  local window = (config or require("claudinho.config").defaults).window
+  local win = vim.g.statusline_winid
+  if type(win) ~= "number" or win == 0 or not vim.api.nvim_win_is_valid(win) then
+    win = 0
+  end
+  return tabs, sessions.state.active, vim.api.nvim_win_get_width(win), window.tab_title_max
+end
+
+---Build the winbar string, with a click region per tab and for the `+`. Without arguments (the winbar expression
+---calls it so) the data comes from the tab registry and the window being drawn.
+---@param tabs ClaudinhoTabInfo[]|nil
 ---@param active integer|nil
----@param width integer
+---@param width integer|nil
 ---@param max integer|nil
 ---@return string winbar
 function M.render(tabs, active, width, max)
+  if tabs == nil then
+    tabs, active, width, max = live()
+  end
+  ---@cast width integer
   local out = {}
   local function click(n)
     return "%" .. n .. "@v:lua." .. M.CLICK_FUNC .. "@"

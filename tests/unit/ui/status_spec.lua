@@ -52,4 +52,28 @@ describe("ui.status", function()
   it("doubles % for the statusline", function()
     assert.equals("100%% model", status.text({ model = "100% model" }))
   end)
+
+  describe("render", function()
+    after_each(function()
+      package.loaded["claudinho.sessions"] = nil
+    end)
+
+    it("shows the data of the active tab", function()
+      package.loaded["claudinho.sessions"] = {
+        active = function()
+          return { data = { model = "Opus 5.5", mode = "plan" } }
+        end,
+      }
+      assert.equals("Opus 5.5 \xC2\xB7 plan", status.render())
+    end)
+
+    it("is empty without an active tab", function()
+      package.loaded["claudinho.sessions"] = {
+        active = function()
+          return nil
+        end,
+      }
+      assert.equals("", status.render())
+    end)
+  end)
 end)

@@ -231,6 +231,24 @@ function M.close(n)
   if s.closing then
     return true
   end
+  -- The neighbour that takes over: the next higher number, else the next lower one.
+  local after, before
+  for _, number in ipairs(numbers()) do
+    if number > n and not after then
+      after = number
+    elseif number < n then
+      before = number
+    end
+  end
+  local next_active = after or before
+
+  -- The window stops showing the buffer that is about to go, and shows the neighbour's.
+  local win = window()
+  if win and type(win.release) == "function" and M.state.active == n then
+    local neighbour = next_active and M.state.tabs[next_active]
+    win.release(s.buf, neighbour and neighbour.buf or nil)
+  end
+
   require("claudinho.session").close(s, "tab closed")
   M.state.tabs[n] = nil
   for id, number in pairs(M.state.by_server) do
@@ -240,20 +258,10 @@ function M.close(n)
   end
 
   if M.state.active == n then
-    local after, before
-    for _, number in ipairs(numbers()) do
-      if number > n and not after then
-        after = number
-      elseif number < n then
-        before = number
-      end
-    end
-    local next_active = after or before
     if next_active then
       set_active(next_active)
     else
       M.state.active = nil
-      local win = window()
       if win and type(win.close) == "function" then
         win.close()
       end
@@ -280,8 +288,14 @@ function M.restart(n)
     notify.reply(err)
     return false, err
   end
+  -- The new buffer takes the old one's place in the window, which `winfixbuf` would refuse.
+  local win = window()
+  if win and type(win.unlock) == "function" then
+    win.unlock()
+  end
   local ok, err = require("claudinho.session").restart(s)
   if not ok then
+    redraw()
     err = err or ("Cannot restart " .. label(n))
     if s.state == "running" then
       notify.reply(err)
@@ -327,6 +341,12 @@ end
 ---only the tabs of this module (rule 61).
 function M.kill_all()
   reject_diffs("all tabs closed")
+  -- The window lets go of the buffer it shows first: a buffer fixed to a window would stop its deletion.
+  local win = window()
+  local active = M.active()
+  if win and active and type(win.release) == "function" then
+    win.release(active.buf, nil)
+  end
   local session = require("claudinho.session")
   for _, n in ipairs(numbers()) do
     session.close(M.state.tabs[n], "all tabs closed")
@@ -334,7 +354,6 @@ function M.kill_all()
   M.state.tabs = {}
   M.state.by_server = {}
   M.state.active = nil
-  local win = window()
   if win and type(win.close) == "function" then
     win.close()
   end

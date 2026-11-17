@@ -190,6 +190,12 @@
 ---@field active integer|nil
 ---@field by_server table<integer, integer> -- server id -> tab number
 
+-- The Claude window (lua/claudinho/ui/window.lua)
+---@class ClaudinhoWindowState
+---@field win integer|nil
+---@field tabpage integer|nil
+---@field hidden_by_diff boolean -- a diff hid the float; only toggle, open or focus bring it back
+
 -- Server interface for main module
 ---@class ClaudinhoServerFacade
 ---@field start fun(config: ClaudinhoConfig, auth_token: string|nil): (success: boolean, port_or_error: number|string)

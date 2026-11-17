@@ -42,4 +42,11 @@ function M.text(data)
   return (table.concat(items, SEPARATOR):gsub("%%", "%%%%"))
 end
 
+---The status line of the window being drawn: the data of the active tab. An ended tab keeps its last status.
+---@return string
+function M.render()
+  local s = require("claudinho.sessions").active()
+  return M.text(s and s.data or nil)
+end
+
 return M
