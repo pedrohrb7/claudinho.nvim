@@ -218,6 +218,107 @@ describe("unified diff window choice", function()
     )
   end)
 
+  describe("with window.layout = left", function()
+    local function use_left(diff_opts, left)
+      require("claudinho").state.config.window.layout = "left"
+      use(diff_opts, { layout = "left", left = left or {} })
+    end
+
+    ---@param win integer
+    ---@return integer col
+    local function col(win)
+      return vim.api.nvim_win_get_position(win)[2]
+    end
+
+    ---A simulated explorer: a fixed-width window with the NvimTree filetype, to the left of `beside`.
+    local function open_explorer(beside)
+      local buf = vim.api.nvim_create_buf(false, true)
+      vim.bo[buf].filetype = "NvimTree"
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "explorer" })
+      local win = vim.api.nvim_open_win(buf, false, { split = "left", win = beside, width = 30 })
+      vim.wo[win].winfixwidth = true
+      return win, buf
+    end
+
+    it("opens the diff in an editor window to the right of Claude, sized by window.left.diff_width", function()
+      use_left({ layout = "vertical" }, { width = 0.30, diff_width = 0.20 })
+      local editor = vim.api.nvim_get_current_win()
+      local terminal_win = open_terminal()
+      local idle_width = vim.api.nvim_win_get_width(terminal_win)
+      assert.equal(math.floor(vim.o.columns * 0.30), idle_width)
+      assert.equal(0, col(terminal_win))
+
+      local diff_win = open_diff()
+
+      assert.equal(0, col(terminal_win), "Claude stays on column 0")
+      assert.equal(math.floor(vim.o.columns * 0.20), vim.api.nvim_win_get_width(terminal_win))
+      assert.is_true(col(diff_win) > col(terminal_win), "the diff is to the right of Claude")
+      assert.are_not.equal(terminal_win, diff_win)
+      assert.is_true(vim.api.nvim_win_is_valid(editor))
+
+      close_tab()
+
+      assert.equal(idle_width, vim.api.nvim_win_get_width(terminal_win), "the width comes back after the diff")
+    end)
+
+    it("opens the diff in the editor, not beside an explorer, and the explorer keeps its buffer", function()
+      use_left({ layout = "unified" })
+      local editor = vim.api.nvim_get_current_win()
+      local terminal_win = open_terminal()
+      local explorer, explorer_buf = open_explorer(editor)
+      assert.is_true(col(terminal_win) < col(explorer) and col(explorer) < col(editor), "Claude, explorer, editor")
+
+      local diff_win = open_diff()
+
+      assert.equal(0, col(terminal_win))
+      assert.is_true(col(diff_win) > col(explorer), "the diff is in the editor area")
+      assert.equal(explorer_buf, vim.api.nvim_win_get_buf(explorer))
+      assert.equal(30, vim.api.nvim_win_get_width(explorer))
+    end)
+
+    it("opens the diff to the right of Claude when it is the only window, which stays on column 0", function()
+      use_left({ layout = "unified" })
+      local terminal_win = open_terminal()
+      vim.cmd("only")
+
+      local diff_win = open_diff()
+
+      assert.equal(0, col(terminal_win))
+      assert.is_true(col(diff_win) > 0, "the diff is to the right of Claude")
+      assert.are_not.equal(terminal_win, diff_win)
+    end)
+
+    it("puts the Claude terminal on the left edge of its new tab, sized by window.left.diff_width", function()
+      use_left({ layout = "unified", open_in_new_tab = true }, { width = 0.30, diff_width = 0.20 })
+      open_terminal()
+      vim.cmd("wincmd p")
+
+      local diff_win = open_diff()
+
+      local terminal_win = diff._get_active_diffs()[tab].terminal_win_in_new_tab
+      assert.is_not_nil(terminal_win, "the new tab shows the Claude terminal")
+      assert.are_not.equal(terminal_win, diff_win, "the diff has a window of its own")
+      assert.equal(0, col(terminal_win))
+      assert.equal(math.floor(vim.o.columns * 0.20), vim.api.nvim_win_get_width(terminal_win))
+      assert.is_true(col(diff_win) > 0, "the diff is to the right of the terminal")
+      assert.same(
+        { "row", { { "leaf", terminal_win }, { "leaf", diff_win } } },
+        vim.fn.winlayout(vim.api.nvim_tabpage_get_number(diff._get_active_diffs()[tab].new_tab_number)),
+        "the terminal takes the whole height"
+      )
+    end)
+
+    it("keeps the width of Claude when auto_resize_terminal is false", function()
+      use_left({ layout = "vertical", auto_resize_terminal = false }, { width = 0.30, diff_width = 0.20 })
+      local terminal_win = open_terminal()
+      local idle_width = vim.api.nvim_win_get_width(terminal_win)
+
+      open_diff()
+
+      assert.equal(idle_width, vim.api.nvim_win_get_width(terminal_win))
+    end)
+  end)
+
   it("sizes a Claude terminal it splits with window.right.diff_width", function()
     use({ layout = "unified" }, { right = { diff_width = 0.20 } })
     local terminal_win = open_terminal()

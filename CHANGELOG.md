@@ -8,6 +8,10 @@ Claudinho.nvim is a hard fork of [claudecode.nvim](https://github.com/coder/clau
 
 ## [Unreleased]
 
+### Added
+
+- The `left` layout: `window.layout = "left"` opens the Claude window on the left edge, over the whole height, beside every editor split. It is the mirror of `right` and has its own sizes, `window.left.width` and `window.left.diff_width` (both validated whatever layout is in use). The default layout is still `right`.
+
 ### Changed
 
 - The whole API is now one command, `:Claudinho <subcommand>`: `toggle` (also what `:Claudinho` does alone), `open`, `hide`, `focus`, `new`, `tab <n>`, `tab-next`, `tab-prev`, `tab-close [n]`, `tab-restart <n>`, `kill-all`, `send`, `add <file> [start] [end]`, `tree-add`, `send-text <text>`, `diff-accept`, `diff-deny`, `close-all-diffs` and `select-model`. The command has completion for the subcommands, the tab numbers and files.
@@ -18,7 +22,7 @@ Claudinho.nvim is a hard fork of [claudecode.nvim](https://github.com/coder/clau
 - `terminal.lua` is now a facade over the active tab (`setup`, `get_active_terminal_bufnr`, `ensure_visible`, `open`, `send_to_terminal`).
 - The log context of the send commands is now `Claudinho send`, `Claudinho add` and so on (it was `ClaudeCodeSend`, `ClaudeCodeAdd`...), also in the `context` field of `User ClaudinhoSendComplete`.
 - `keymaps = { preset = true }` maps the `<leader>a*` keys to the subcommands (20 keys; `<leader>as` in Visual mode). A key that is already mapped is left alone, with a notice when `notify = true`. Nothing is mapped by default.
-- A diff reads the Claude window's size from `window.right.width` and `window.right.diff_width` (they replace `terminal.split_width_percentage` and `terminal.diff_split_width_percentage`). Only the `right` layout is resized while a diff is open; the Claude window has a fixed width, so the other windows of the tab share the rest equally, and the diff keeps at least a third of the screen. A diff that opens in a new tab puts the Claude window to the right, or below with `window.layout = "bottom"`.
+- A diff reads the Claude window's size from `window.right.width` and `window.right.diff_width` (they replace `terminal.split_width_percentage` and `terminal.diff_split_width_percentage`). Only the `right` and `left` layouts are resized while a diff is open; the Claude window has a fixed width, so the other windows of the tab share the rest equally, and the diff keeps at least a third of the screen. A diff that opens in a new tab puts the Claude window to the right, to the left with `window.layout = "left"`, or below with `window.layout = "bottom"`.
 - Removed config keys warn only with `notify = true` (read as given, before the config is merged), and `:checkhealth claudinho` lists each one the config still has. `terminal.provider` is a removed key with any value (`"snacks"` no longer becomes `"native"`).
 - New tabs always start in Neovim's current directory (`:pwd`).
 - claudecode.nvim installed next to Claudinho is now a warning, not a refusal: both plugins run, `setup()` configures everything and `:Claudinho` exists. With `notify = true`, `[Claudinho] claudecode.nvim is also installed. Both plugins run, but Claudinho replaces it: remove claudecode.nvim.` shows once per session. `:checkhealth claudinho` shows a WARN for it, with or without `setup()`. `plugin/claudinho.lua` no longer checks for it.

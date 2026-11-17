@@ -378,3 +378,33 @@ Mode: `--step`, same gate policy as the 2026-11-15 run. The run state `.claude/r
 - **Migrations / env vars:** none.
 - **Docs pending:** `README.md` and `README.en.md` (Task 17): "Coming from claudecode.nvim" says both run and removing claudecode.nvim is recommended (rule 33). `CLAUDE.md` (Task 18): the Vision line "The plugin refuses to run when claudecode.nvim is loaded" is now wrong. `ARCHITECTURE.md` and `PROTOCOL.md` (Task 20): any mention of the Phase 0 refusal.
 - **Manual checks:** with claudecode.nvim installed next to Claudinho, `:Claudinho` works and `:checkhealth claudinho` shows the WARN with the advice, with and without `setup()`; with `notify = true` the warning shows once per start, with `notify = false` none.
+
+## Run 2026-11-17
+
+Mode: tasks selected by the user (Task 23 only), same gate policy as the earlier runs. The run state `.claude/runs/base-ui.json` was missing and was created for this run. Toolchain reinstalled by the user before the checks (`mise install`, `mise run setup`, `base-devel` on Void Linux); plenary installed at the CI SHA with the user's approval.
+
+### Task 23 - Layout `left` (done)
+
+- **Files:**
+  - `lua/claudinho/config.lua`: default `window.left = { width = 0.30, diff_width = nil }`, `"left"` in `VALID_LAYOUTS`; `window.right` and `window.left` validated by one shared loop, with the exact messages, under any layout.
+  - `lua/claudinho/types.lua`: layout union gains `"left"`; new `window.left` field.
+  - `lua/claudinho/ui/window.lua`: `LAYOUTS` gains `left`; `geometry("left")` from `window.left.width`; `open_window` splits to the left edge (`split = "left", win = -1`) with `winfixwidth`.
+  - `lua/claudinho/diff.lua`: `sized_side()` reads `window.left` or `window.right`; the resize gate accepts `right` and `left`; the new-tab terminal uses `wincmd H` then `wincmd l` for `left`; comments updated.
+  - `CHANGELOG.md`: Added entry for `left`; two Changed lines mention `left`.
+  - `fixtures/{netrw,nvim-tree,oil,mini-files}/lua/plugins/dev-claudinho.lua`: the commented window block lists the five layouts and `window.left`.
+  - Tests: `tests/unit/config_spec.lua` (43), `tests/config_test.lua` (6), `tests/unit/ui/window_geometry_spec.lua` (22), `tests/unit/diff_split_width_spec.lua` (10), `tests/unit/diff_auto_resize_events_spec.lua` (23), `tests/unit/diff_new_tab_terminal_handler_spec.lua` (9), `tests/integration/window_spec.lua` (39), `tests/integration/diff_window_choice_spec.lua` (21).
+- **Decisions:**
+  - Removed-key messages untouched; they still point to `window.right.*`.
+  - The `left` diff-width integration cases use `diff_opts.layout = "vertical"`: a unified diff with an editor window present does not resize Claude, with `right` too (pre-existing, to the backlog).
+  - `window_spec` checks full height through `winlayout` (Claude is the first leaf of a single top-level row) plus equal heights and the same row as the editor windows.
+  - Fix round 1 (quality-fixer): `window_spec` nested `assert(window.win())` inside `nvim_win_get_width`; luassert's `assert` returns several values ("Expected 1 argument"). Now bound to a local first, like the rest of the file.
+  - Checks (test-runner): `check` 0 warnings / 0 errors in 208 files; `format-check` green; the 6 unit files under busted green; `window_spec` 39 / 0 and `diff_window_choice_spec` 21 / 0 (Neovim 0.12.3 through `mise exec`, plenary 74b06c6).
+- **Assumptions:** the new-tab `diff_width` test reads the terminal width at `floor(columns * 0.20)` after open.
+- **Approved scope:** none.
+- **Migrations / env vars:** none (new config keys `window.left.width`, `window.left.diff_width`).
+- **Docs pending:** `README.md` and `README.en.md` (Task 17): layout `left`, `window.left.width`/`diff_width`, migration from `terminal.split_side = "left"`. `CLAUDE.md`, `ARCHITECTURE.md`, `PROTOCOL.md` (Tasks 18 and 20): `left` in the window and diff sections.
+- **Manual checks:** `window.layout = "left"` with two vertical editor splits (column 0, full height, `floor(columns * 0.30)`, fixed width); nvim-tree fixture with the explorer opened before and after Claude, and hide + open; a diff with `window.left.diff_width` (shrinks, returns after accept or reject); `open_in_new_tab = true` (terminal on the left edge of the new tab); an invalid `window.left.*` under `right` and `left`.
+- **Out of scope:** unified diff with an editor window present does not resize the Claude window to `diff_width` (also with `right`). To the backlog.
+- **Review (code-reviewer):** ship; fixed in the same round: a geometry case "right ignores window.left.width", `resolve_split_width_percentage` local renamed to `side`, `sized_side` uses `window_layout()`, the `window.right`/`window.left` validation is a local function `normalize_side` (as section 15 says).
+- **Final gate (test-runner):** `check` 0 / 0 in 208 files; `format-check` green; `unit` (`BUSTED_SEED=12345 CI=true`) 1917 / 0 / 0 / 34 (514 s); `integration` (Neovim 0.12.3) 36 files, 583 passed, 1 failed: `tests/integration/session_spec.lua:84`, which reads `CLAUDINHO_PORT` inherited from the caller's shell (passes 9 / 0 with the `CLAUDINHO_*` vars unset). Registered in `docs/backlog/bugs/2026-11-17-session-spec-depends-on-caller-env.md`. The known `claude_stub_spec` failure passed in this run.
+- **Backlog:** `docs/backlog/bugs/2026-11-17-unified-diff-does-not-resize-claude-window.md` (low), `docs/backlog/bugs/2026-11-17-session-spec-depends-on-caller-env.md` (medium).

@@ -117,6 +117,30 @@ describe("resize_terminal_for_diff gating", function()
     assert.are.equal(1, #calls)
   end)
 
+  it("resizes when window.layout is left, with window.left's widths", function()
+    local calls = capture_resize({
+      window = { layout = "left", left = { width = 0.4, diff_width = 0.2 }, right = { width = 0.5, diff_width = 0.6 } },
+      diff_opts = { auto_resize_terminal = true },
+      when = "diff",
+    })
+    assert.are.equal(1, #calls)
+    assert.are.equal(40, calls[1].width)
+    calls = capture_resize({
+      window = { layout = "left", left = { width = 0.4, diff_width = 0.2 } },
+      when = "idle",
+    })
+    assert.are.equal(80, calls[1].width)
+  end)
+
+  it("does NOT resize with the left layout when auto_resize_terminal is false", function()
+    local calls = capture_resize({
+      window = { layout = "left", left = { width = 0.4, diff_width = 0.2 } },
+      diff_opts = { auto_resize_terminal = false },
+      when = "diff",
+    })
+    assert.are.equal(0, #calls)
+  end)
+
   describe("a Claude window of fixed width", function()
     local saved, commands
 

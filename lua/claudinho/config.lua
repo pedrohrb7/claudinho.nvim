@@ -40,10 +40,14 @@ M.defaults = {
     { name = "Default (account recommended)", value = "default" },
   },
   window = {
-    layout = "right", -- "right", "bottom", "float" or "tab"
+    layout = "right", -- "right", "left", "bottom", "float" or "tab"
     right = {
       width = 0.30, -- fraction of the editor width, in (0, 1)
       diff_width = nil, -- nil, or a fraction in (0, 1): width while a diff is open
+    },
+    left = {
+      width = 0.30, -- as `right.width`, used with the "left" layout
+      diff_width = nil, -- as `right.diff_width`, used with the "left" layout
     },
     bottom = { height = 0.30 },
     float = { width = 0.80, height = 0.80 },
@@ -315,7 +319,7 @@ function M.validate(config)
   return true
 end
 
-local VALID_LAYOUTS = { "right", "bottom", "float", "tab" }
+local VALID_LAYOUTS = { "right", "left", "bottom", "float", "tab" }
 
 ---Text of a value in an error message: strings quoted, the rest as tostring.
 ---@param value any
@@ -397,12 +401,18 @@ function M.normalize_new_keys(config)
     end
   end
 
-  local right = ensure_table(window, "right", "window.right", d.right)
-  check(right, "width", "window.right.width", d.right.width, is_fraction)
-  if right.diff_width ~= nil and not is_fraction(right.diff_width) then
-    notify.error("[Claudinho] window.right.diff_width = " .. show(right.diff_width) .. " is not valid; using nil.")
-    right.diff_width = nil
+  -- `right` and `left` share their rules, and both are checked whatever the layout in use.
+  local function normalize_side(side)
+    local path = "window." .. side
+    local sized = ensure_table(window, side, path, d[side])
+    check(sized, "width", path .. ".width", d[side].width, is_fraction)
+    if sized.diff_width ~= nil and not is_fraction(sized.diff_width) then
+      notify.error("[Claudinho] " .. path .. ".diff_width = " .. show(sized.diff_width) .. " is not valid; using nil.")
+      sized.diff_width = nil
+    end
   end
+  normalize_side("right")
+  normalize_side("left")
 
   local bottom = ensure_table(window, "bottom", "window.bottom", d.bottom)
   check(bottom, "height", "window.bottom.height", d.bottom.height, is_fraction)

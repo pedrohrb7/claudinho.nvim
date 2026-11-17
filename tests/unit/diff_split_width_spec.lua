@@ -40,4 +40,35 @@ describe("Diff/idle terminal split width resolution", function()
     assert.are.equal(0.3, resolve("idle"))
     assert.are.equal(0.6, resolve("diff"))
   end)
+
+  describe("left layout", function()
+    it("reads window.left and ignores window.right", function()
+      diff.setup({
+        window = {
+          layout = "left",
+          left = { width = 0.4, diff_width = 0.2 },
+          right = { width = 0.5, diff_width = 0.6 },
+        },
+      })
+      assert.are.equal(0.4, resolve("idle"))
+      assert.are.equal(0.2, resolve("diff"))
+    end)
+
+    it("uses the idle width when diff_width is unset", function()
+      diff.setup({ window = { layout = "left", left = { width = 0.45 } } })
+      assert.are.equal(0.45, resolve("diff"))
+    end)
+
+    it("falls back to 0.30 and ignores a bad diff width", function()
+      diff.setup({ window = { layout = "left", left = { diff_width = 2 }, right = { width = 0.5 } } })
+      assert.are.equal(0.30, resolve("idle"))
+      assert.are.equal(0.30, resolve("diff"))
+    end)
+
+    it("the right layout ignores window.left", function()
+      diff.setup({ window = { layout = "right", left = { width = 0.4, diff_width = 0.2 }, right = { width = 0.5 } } })
+      assert.are.equal(0.5, resolve("idle"))
+      assert.are.equal(0.5, resolve("diff"))
+    end)
+  end)
 end)

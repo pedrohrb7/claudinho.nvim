@@ -92,8 +92,9 @@
 ---@field notify boolean Informative notifications (errors and replies always show)
 
 ---@class ClaudinhoWindowConfig
----@field layout "right"|"bottom"|"float"|"tab"
+---@field layout "right"|"left"|"bottom"|"float"|"tab"
 ---@field right { width: number, diff_width: number|nil }
+---@field left { width: number, diff_width: number|nil }
 ---@field bottom { height: number }
 ---@field float { width: number, height: number }
 ---@field tab_title_max integer

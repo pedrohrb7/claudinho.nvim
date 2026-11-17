@@ -7,6 +7,7 @@ describe("ui.window geometry", function()
   local defaults = {
     layout = "right",
     right = { width = 0.30 },
+    left = { width = 0.30 },
     bottom = { height = 0.30 },
     float = { width = 0.80, height = 0.80 },
     tab_title_max = 24,
@@ -38,6 +39,34 @@ describe("ui.window geometry", function()
         assert.same({ width = case[3] }, geometry)
       end)
     end
+  end)
+
+  it("right ignores window.left.width", function()
+    local geometry = window.geometry("right", { columns = 100, lines = 50 }, window_config({ left = { width = 0.5 } }))
+    assert.same({ width = 30 }, geometry)
+  end)
+
+  describe("left", function()
+    local cases = {
+      { 200, 0.30, 60 },
+      { 120, 0.30, 36 },
+      { 101, 0.30, 30 },
+      { 80, 0.50, 40 },
+      { 10, 0.05, 1 },
+    }
+    for _, case in ipairs(cases) do
+      it(("takes floor(%d * %s) = %d columns"):format(case[1], case[2], case[3]), function()
+        local geometry =
+          window.geometry("left", { columns = case[1], lines = 50 }, window_config({ left = { width = case[2] } }))
+        assert.same({ width = case[3] }, geometry)
+      end)
+    end
+
+    it("ignores window.right.width", function()
+      local geometry =
+        window.geometry("left", { columns = 100, lines = 50 }, window_config({ right = { width = 0.5 } }))
+      assert.same({ width = 30 }, geometry)
+    end)
   end)
 
   describe("bottom", function()

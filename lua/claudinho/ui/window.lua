@@ -1,8 +1,8 @@
 -- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/terminal/native.lua (MIT, see LICENSE)
 ---@brief [[
 --- The Claude window: one per Neovim (rule 16). It shows the terminal buffer of the active tab, with the tab bar in
---- its winbar and the status of the tab in its statusline, in the layout of `config.window.layout` (`right`, `bottom`,
---- `float` or `tab`). Hiding it never ends a session (rule 23). `claudinho.sessions` tells it to `show`, `refresh`,
+--- its winbar and the status of the tab in its statusline, in the layout of `config.window.layout` (`right`, `left`,
+--- `bottom`, `float` or `tab`). Hiding it never ends a session (rule 23). `claudinho.sessions` tells it to `show`, `refresh`,
 --- `release` and `close`; the window never owns a tab.
 ---@brief ]]
 ---@module 'claudinho.ui.window'
@@ -16,7 +16,7 @@ M.state = { win = nil, tabpage = nil, hidden_by_diff = false }
 
 local AUGROUP = "ClaudinhoWindow"
 local ready = false
-local LAYOUTS = { right = true, bottom = true, float = true, tab = true }
+local LAYOUTS = { right = true, left = true, bottom = true, float = true, tab = true }
 local WINBAR = "%!v:lua.require'claudinho.ui.tabbar'.render()"
 local STATUSLINE = "%!v:lua.require'claudinho.ui.status'.render()"
 
@@ -43,7 +43,7 @@ local function clamp(value, low, high)
   return math.max(low, math.min(high, value))
 end
 
----Size and place of the window for a layout. `right` and `bottom` take their share of the whole screen, `float` is
+---Size and place of the window for a layout. `right`, `left` and `bottom` take their share of the whole screen, `float` is
 ---centered in the editor area (the screen less the command line, the tabline and the statusline), and `tab` takes the
 ---whole tab and needs no size.
 ---@param layout string
@@ -66,6 +66,8 @@ function M.geometry(layout, env, window_config)
     }
   elseif layout == "tab" then
     return {}
+  elseif layout == "left" then
+    return { width = math.max(1, math.floor(env.columns * window_config.left.width)) }
   end
   return { width = math.max(1, math.floor(env.columns * window_config.right.width)) }
 end
@@ -230,7 +232,9 @@ local function open_window(buf, focus)
     win = vim.api.nvim_open_win(buf, focus, { split = "below", win = -1, height = geometry.height })
     set_wo(win, "winfixheight", true)
   else
-    win = vim.api.nvim_open_win(buf, focus, { split = "right", win = -1, width = geometry.width })
+    -- `win = -1` splits at the top level: the left or right edge, the whole height, beside every editor split.
+    local side = name == "left" and "left" or "right"
+    win = vim.api.nvim_open_win(buf, focus, { split = side, win = -1, width = geometry.width })
     set_wo(win, "winfixwidth", true)
   end
   M.state.win = win

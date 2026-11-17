@@ -47,17 +47,24 @@ local function window_layout()
   return type(window) == "table" and window.layout or "right"
 end
 
+---The `window` table that sizes the Claude window: `window.left` with the `left` layout, else `window.right`.
+---@return table side An empty table when the config has none
+local function sized_side()
+  local window = config and config.window
+  local key = window_layout() == "left" and "left" or "right"
+  return type(window) == "table" and type(window[key]) == "table" and window[key] or {}
+end
+
 ---Resolve the Claude window's width fraction for the current context.
----While a diff is active, an optional `window.right.diff_width` (a number in the open interval (0, 1)) takes
----precedence so the Claude window can shrink to give the diff more room. It falls back to the idle
----`window.right.width`, then to the 0.30 default.
+---While a diff is active, an optional `diff_width` of the layout's side (`window.right` or `window.left`; a number in
+---the open interval (0, 1)) takes precedence so the Claude window can shrink to give the diff more room. It falls back
+---to the idle `width` of that side, then to the 0.30 default.
 ---@param when "diff"|"idle" Whether a diff is currently active or being torn down
 ---@return number fraction A width fraction in (0, 1)
 local function resolve_split_width_percentage(when)
-  local window = (config and config.window) or {}
-  local right = type(window.right) == "table" and window.right or {}
+  local side = sized_side()
 
-  local idle = right.width
+  local idle = side.width
   if type(idle) ~= "number" or idle <= 0 or idle >= 1 then
     idle = 0.30
   end
@@ -65,7 +72,7 @@ local function resolve_split_width_percentage(when)
   if when == "diff" then
     -- Defensively validate here too: this is the authoritative guard for the value we consume (config.apply already
     -- replaces a bad value, but diff.setup also takes a partial config).
-    local diff_width = right.diff_width
+    local diff_width = side.diff_width
     if type(diff_width) == "number" and diff_width > 0 and diff_width < 1 then
       return diff_width
     end
@@ -95,7 +102,7 @@ M._auto_resize_enabled = auto_resize_enabled
 ---Resize a Claude terminal split window for the current diff phase.
 ---No-ops when the user opted out (`auto_resize_terminal = false`), when the
 ---window is missing/invalid, when it is a floating window (those manage their
----own sizing), or when `window.layout` is not "right" (a "bottom" window already has the full width). Used for both
+---own sizing), or when `window.layout` is neither "right" nor "left" (a "bottom" window already has the full width). Used for both
 ---the during-diff shrink and the on-close restore.
 ---A Claude window of fixed width (`winfixwidth`) in the current tab gives the width it frees to one neighbour only, so
 ---when a diff opens the other windows of the tab are equalized again, and the diff windows share what is left.
@@ -112,7 +119,8 @@ local function resize_terminal_for_diff(win, when)
   if win_config.relative and win_config.relative ~= "" then
     return -- floating terminals control their own sizing
   end
-  if window_layout() ~= "right" then
+  local layout_name = window_layout()
+  if layout_name ~= "right" and layout_name ~= "left" then
     return
   end
   local split_width = resolve_split_width_percentage(when)
@@ -431,8 +439,10 @@ local function display_terminal_in_new_tab()
   mark_tabnew_buffer_ephemeral()
   local new_tab = vim.api.nvim_get_current_tabpage()
 
-  -- The Claude window of a new diff tab goes to the right, or to the bottom with `window.layout = "bottom"`.
-  local at_bottom = window_layout() == "bottom"
+  -- The Claude window of a new diff tab goes to the layout's edge: right, left, or bottom.
+  local layout_name = window_layout()
+  local at_bottom = layout_name == "bottom"
+  local at_left = layout_name == "left"
 
   -- Optionally hide the Claude terminal in the new tab for more review space
   local hide_in_new_tab = false
@@ -449,7 +459,7 @@ local function display_terminal_in_new_tab()
 
   local terminal_win = vim.api.nvim_get_current_win()
 
-  vim.cmd(at_bottom and "wincmd J" or "wincmd L")
+  vim.cmd(at_bottom and "wincmd J" or (at_left and "wincmd H" or "wincmd L"))
 
   utils.win_set_buf_without_bufenter(terminal_win, terminal_bufnr)
 
@@ -483,7 +493,7 @@ local function display_terminal_in_new_tab()
   -- Size the terminal for the diff (unless the user opted out via auto_resize_terminal).
   resize_terminal_for_diff(terminal_win, "diff")
 
-  vim.cmd(at_bottom and "wincmd k" or "wincmd h")
+  vim.cmd(at_bottom and "wincmd k" or (at_left and "wincmd l" or "wincmd h"))
 
   return original_tab, terminal_win, had_terminal_in_original, new_tab
 end
@@ -1493,7 +1503,7 @@ function M._cleanup_diff_state(tab_name, reason)
     if terminal_ok and diff_data.had_terminal_in_original then
       -- No idle resize: the diff resized only the terminal window in its own tab, which closed with that tab, so a
       -- terminal window that stayed open keeps its width, a width the user chose included. One that ensure_visible
-      -- has to open gets window.right.width from the window module.
+      -- has to open gets its width from the window module.
       pcall(terminal_module.ensure_visible)
     end
   else

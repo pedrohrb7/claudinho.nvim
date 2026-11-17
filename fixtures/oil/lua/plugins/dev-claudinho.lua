@@ -74,8 +74,9 @@ return {
 
     -- Window Configuration
     -- window = {
-    --   layout = "right",                         -- "right", "bottom", "float" or "tab"
+    --   layout = "right",                         -- "right", "left", "bottom", "float" or "tab"
     --   right = { width = 0.30, diff_width = nil }, -- width as a fraction; diff_width applies while a diff is open
+    --   left = { width = 0.30, diff_width = nil },  -- the same, for the "left" layout
     --   bottom = { height = 0.30 },
     --   float = { width = 0.80, height = 0.80 },
     --   tab_title_max = 24,                       -- longest tab title in the winbar

@@ -269,6 +269,8 @@ describe("Configuration", function()
       expect(c.window.layout).to_be("right")
       expect(c.window.right.width).to_be(0.30)
       expect(c.window.right.diff_width).to_be_nil()
+      expect(c.window.left.width).to_be(0.30)
+      expect(c.window.left.diff_width).to_be_nil()
       expect(c.window.bottom.height).to_be(0.30)
       expect(c.window.float.width).to_be(0.80)
       expect(c.window.float.height).to_be(0.80)
@@ -294,12 +296,57 @@ describe("Configuration", function()
       expect(#notes).to_be(0)
     end)
 
+    it("accepts the left layout with its own sizes and leaves window.right alone", function()
+      local c = config.apply({ window = { layout = "left", left = { width = 0.4, diff_width = 0.2 } } })
+      expect(c.window.layout).to_be("left")
+      expect(c.window.left.width).to_be(0.4)
+      expect(c.window.left.diff_width).to_be(0.2)
+      expect(c.window.right.width).to_be(0.30)
+      expect(c.window.right.diff_width).to_be_nil()
+      expect(#notes).to_be(0)
+    end)
+
+    for _, layout in ipairs({ "right", "left" }) do
+      for _, case in ipairs({
+        { key = "width", value = 0, msg = "[Claudinho] window.left.width = 0 is not valid; using 0.3." },
+        { key = "width", value = 1, msg = "[Claudinho] window.left.width = 1 is not valid; using 0.3." },
+        { key = "width", value = -0.2, msg = "[Claudinho] window.left.width = -0.2 is not valid; using 0.3." },
+        { key = "width", value = "x", msg = '[Claudinho] window.left.width = "x" is not valid; using 0.3.' },
+        { key = "diff_width", value = 0, msg = "[Claudinho] window.left.diff_width = 0 is not valid; using nil." },
+        { key = "diff_width", value = 1.5, msg = "[Claudinho] window.left.diff_width = 1.5 is not valid; using nil." },
+        { key = "diff_width", value = "x", msg = '[Claudinho] window.left.diff_width = "x" is not valid; using nil.' },
+      }) do
+        local title = ("window.left.%s = %s falls back with the exact error under layout %s"):format(
+          case.key,
+          tostring(case.value),
+          layout
+        )
+        it(title, function()
+          local c = config.apply({ window = { layout = layout, left = { [case.key] = case.value } } })
+          expect(#notes).to_be(1)
+          expect(notes[1].msg).to_be(case.msg)
+          expect(notes[1].level).to_be(vim.log.levels.ERROR)
+          expect(c.window.left.width).to_be(0.30)
+          expect(c.window.left.diff_width).to_be_nil()
+          expect(c.window.right.width).to_be(0.30)
+          expect(c.window.right.diff_width).to_be_nil()
+        end)
+      end
+    end
+
+    it("replaces a window.left that is not a table, with the exact error", function()
+      local c = config.apply({ window = { left = "x" } })
+      expect(#notes).to_be(1)
+      expect(notes[1].msg).to_be('[Claudinho] window.left = "x" is not valid; using the default window.left.')
+      expect(c.window.left.width).to_be(0.30)
+    end)
+
     it("falls back to right on an invalid layout, with the exact error", function()
       local c = config.apply({ window = { layout = "sidebar" } })
       expect(c.window.layout).to_be("right")
       expect(#notes).to_be(1)
       expect(notes[1].msg).to_be(
-        '[Claudinho] window.layout = "sidebar" is not valid; using "right". Valid layouts: right, bottom, float, tab.'
+        '[Claudinho] window.layout = "sidebar" is not valid; using "right". Valid layouts: right, left, bottom, float, tab.'
       )
       expect(notes[1].level).to_be(vim.log.levels.ERROR)
       expect(notes[1].opts.title).to_be("Claudinho")

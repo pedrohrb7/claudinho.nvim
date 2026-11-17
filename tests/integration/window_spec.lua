@@ -103,7 +103,7 @@ describe("window", function()
   end)
 
   describe("layouts", function()
-    local layouts = { "right", "bottom", "float", "tab" }
+    local layouts = { "right", "left", "bottom", "float", "tab" }
     for _, name in ipairs(layouts) do
       it(("opens as %s with a winbar and a statusline and takes the terminal mode"):format(name), function()
         layout = name
@@ -130,6 +130,112 @@ describe("window", function()
       assert.is_true(vim.wo[win].winfixwidth)
       assert.equals(first.buf, vim.api.nvim_win_get_buf(win))
       assert.equals(win, vim.fn.win_getid(vim.fn.winnr("$")))
+    end)
+
+    ---@return integer left, integer right the two editor windows of the spec
+    local function two_editor_splits()
+      vim.cmd("vsplit")
+      local right = vim.api.nvim_get_current_win()
+      vim.cmd("vsplit")
+      return vim.api.nvim_get_current_win(), right
+    end
+
+    ---@param width integer
+    ---@return integer win a simulated explorer on the left edge: a fixed-width window with the NvimTree filetype
+    local function open_explorer(width)
+      local buf = vim.api.nvim_create_buf(false, true)
+      vim.bo[buf].filetype = "NvimTree"
+      local win = vim.api.nvim_open_win(buf, false, { split = "left", win = -1, width = width })
+      vim.wo[win].winfixwidth = true
+      return win
+    end
+
+    it("left takes floor(columns * 0.30) columns on column 0, the whole height, beside two editor splits", function()
+      layout = "left"
+      setup_plugin()
+      local first_editor, second_editor = two_editor_splits()
+      local first = assert(sessions.new())
+      local win = assert(window.win())
+
+      assert.equals(first.buf, vim.api.nvim_win_get_buf(win))
+      assert.equals(math.floor(vim.o.columns * 0.30), vim.api.nvim_win_get_width(win))
+      assert.is_true(vim.wo[win].winfixwidth)
+      local position = vim.api.nvim_win_get_position(win)
+      assert.equals(0, position[2])
+      for _, editor in ipairs({ first_editor, second_editor }) do
+        assert.equals(vim.api.nvim_win_get_position(editor)[1], position[1])
+        assert.equals(vim.api.nvim_win_get_height(editor), vim.api.nvim_win_get_height(win))
+      end
+      local top = vim.fn.winlayout()
+      assert.equals("row", top[1])
+      assert.equals(4, #top[2], "Claude and three editor windows in one row")
+      assert.same({ "leaf", win }, top[2][1])
+    end)
+
+    it("left follows window.left.width and ignores window.right.width", function()
+      layout = "left"
+      local config = make_config()
+      config.window.left.width = 0.45
+      config.window.right.width = 0.10
+      package.loaded["claudinho"] = { state = { config = config } }
+      assert(sessions.new())
+      local win = assert(window.win())
+      assert.equals(math.floor(vim.o.columns * 0.45), vim.api.nvim_win_get_width(win))
+    end)
+
+    it("left: open from another Neovim tab and toggle put the window on the left edge there", function()
+      layout = "left"
+      setup_plugin()
+      assert(sessions.new())
+      vim.cmd("stopinsert")
+      vim.cmd("tabnew")
+      two_editor_splits()
+
+      window.open()
+
+      local win = assert(window.win())
+      assert.equals(vim.api.nvim_get_current_tabpage(), vim.api.nvim_win_get_tabpage(win))
+      assert.equals(0, vim.api.nvim_win_get_position(win)[2])
+
+      window.toggle()
+      assert.is_nil(window.win())
+      window.toggle()
+      win = assert(window.win())
+      assert.equals(0, vim.api.nvim_win_get_position(win)[2])
+      assert.same({ "leaf", win }, vim.fn.winlayout()[2][1])
+    end)
+
+    it("left opens to the left of an explorer that was open, and the explorer keeps its columns", function()
+      layout = "left"
+      setup_plugin()
+      local explorer = open_explorer(30)
+
+      assert(sessions.new())
+      local win = assert(window.win())
+
+      assert.equals(0, vim.api.nvim_win_get_position(win)[2])
+      assert.is_true(vim.api.nvim_win_get_position(explorer)[2] > 0)
+      assert.equals(30, vim.api.nvim_win_get_width(explorer))
+    end)
+
+    it("left does not move when an explorer opens after it, and hide plus open bring it back to column 0", function()
+      layout = "left"
+      setup_plugin()
+      assert(sessions.new())
+      local win = assert(window.win())
+      vim.cmd("stopinsert")
+      local explorer = open_explorer(30)
+
+      assert.equals(win, window.win())
+      assert.equals(0, vim.api.nvim_win_get_position(explorer)[2])
+      assert.is_true(vim.api.nvim_win_get_position(win)[2] > 0)
+
+      window.hide()
+      window.open()
+
+      win = assert(window.win())
+      assert.equals(0, vim.api.nvim_win_get_position(win)[2])
+      assert.equals(30, vim.api.nvim_win_get_width(explorer))
     end)
 
     it("bottom takes about floor(lines * 0.30) rows at the bottom", function()

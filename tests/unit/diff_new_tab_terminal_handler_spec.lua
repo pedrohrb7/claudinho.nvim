@@ -157,4 +157,50 @@ describe("Diff in a new tab: the terminal's auto-enter handler", function()
       end)
     end)
   end
+
+  describe("where the terminal goes in the new tab", function()
+    local expected = {
+      left = { "vsplit", "wincmd H", "wincmd l" },
+      right = { "vsplit", "wincmd L", "wincmd h" },
+      bottom = { "split", "wincmd J", "wincmd k" },
+    }
+
+    for _, layout in ipairs({ "left", "right", "bottom" }) do
+      it("follows window.layout = " .. layout, function()
+        diff.setup({
+          window = { layout = layout, right = { width = 0.30 }, left = { width = 0.30 } },
+          terminal = { auto_insert = true },
+          diff_opts = { layout = "vertical", open_in_new_tab = true, hide_terminal_in_new_tab = false },
+        })
+        local commands = {}
+        local original_cmd = vim.cmd
+        vim.cmd = function(command)
+          commands[#commands + 1] = command
+          return original_cmd(command)
+        end
+        local tab_name = "new-tab-side-" .. layout
+        local ok, co = pcall(open_diff, tab_name)
+        vim.cmd = original_cmd
+        assert.is_true(ok, tostring(co))
+
+        local at = {}
+        for i, command in ipairs(commands) do
+          at[command] = at[command] or i
+        end
+        local want = expected[layout]
+        assert.is_truthy(at[want[1]], "missing " .. want[1])
+        assert.is_truthy(at[want[2]], "missing " .. want[2])
+        assert.is_truthy(at[want[3]], "missing " .. want[3])
+        assert.is_true(at[want[1]] < at[want[2]] and at[want[2]] < at[want[3]])
+        assert.equal(1, #terminal_handlers(), "the auto-enter handler is made for the terminal window")
+        for other, cmds in pairs(expected) do
+          if other ~= layout then
+            assert.is_nil(at[cmds[2]], "unexpected " .. cmds[2])
+          end
+        end
+
+        close_diff(tab_name, co)
+      end)
+    end
+  end)
 end)
