@@ -819,7 +819,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `lua/claudinho/tools/open_diff.lua`, `lua/claudinho/diff.lua`, `lua/claudinho/sessions.lua`, `lua/claudinho/types.lua`, `tests/unit/diff_routing_spec.lua`, `tests/unit/opendiff_blocking_spec.lua`, `tests/unit/diff_mcp_spec.lua`, `tests/integration/diff_routing_spec.lua`, `tests/helpers/**`
 - **Depends on:** Task 10
 - **Done when:** a seção 9 está aplicada; `diff_routing_spec` (unit e integração) passa e os specs de diff existentes passam sem mudança de asserção; gate verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 12 - Comando `:Claudinho` e fim dos `:ClaudeCode*` e dos providers
 

@@ -62,6 +62,15 @@ local function handler(params, client)
     error({ code = -32000, message = "Internal server error", data = "Failed to load diff module" })
   end
 
+  -- A client of a tab in the background waits here until the tab becomes active (rule 31). "reject" comes when the
+  -- tab closes or the diffs are rejected: the answer is the same as a rejected diff, with no window.
+  local sessions = package.loaded["claudinho.sessions"]
+  if type(sessions) == "table" and type(sessions.gate_diff) == "function" then
+    if sessions.gate_diff(client, params) == "reject" then
+      return diff_module.rejected_response(params.tab_name)
+    end
+  end
+
   -- Use the new blocking diff operation
   local success, result = pcall(
     diff_module.open_diff_blocking,

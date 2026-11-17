@@ -1096,6 +1096,18 @@ local function reload_file_buffers(file_path, original_cursor_pos)
   end
 end
 
+---The MCP response of a rejected diff. A diff that waited for its tab and never opened answers with it too.
+---@param tab_name string The diff identifier
+---@return table response MCP-compliant response with content array
+function M.rejected_response(tab_name)
+  return {
+    content = {
+      { type = "text", text = "DIFF_REJECTED" },
+      { type = "text", text = tab_name },
+    },
+  }
+end
+
 ---Resolve diff as rejected (user closed/rejected)
 ---@param tab_name string The diff identifier
 function M._resolve_diff_as_rejected(tab_name)
@@ -1112,13 +1124,7 @@ function M._resolve_diff_as_rejected(tab_name)
     return
   end
 
-  -- Create MCP-compliant response
-  local result = {
-    content = {
-      { type = "text", text = "DIFF_REJECTED" },
-      { type = "text", text = tab_name },
-    },
-  }
+  local result = M.rejected_response(tab_name)
 
   diff_data.status = "rejected"
   diff_data.result_content = result

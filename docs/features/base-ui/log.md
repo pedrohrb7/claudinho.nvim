@@ -265,3 +265,25 @@ Mode: `--step`, same gate policy as the 2026-11-15 run. The run state `.claude/r
   - `:q` and `<C-w>c` on the Claude window hide it and the process keeps running; `:bwipeout` of a visible tab's buffer is refused by `winfixbuf` (confirm this is acceptable); `gt` to another tab then open moves the window there.
   - `:q` in the last editor window while Claude is open (`right` and `float`) leaves Neovim without a prompt and leaves no lock files in `~/.claude/ide`.
   - Float and diff: opening a diff hides the float; open/toggle/focus bring it back.
+
+### Task 11 - Diff por aba (done)
+
+- **Files:**
+  - `lua/claudinho/sessions.lua`: new `gate_diff(client, params)` and a local `resume_waiting` helper; `reject_all_pending` now redraws the bar.
+  - `lua/claudinho/tools/open_diff.lua`: calls `sessions.gate_diff` before `open_diff_blocking`; returns `diff.rejected_response` on `"reject"`.
+  - `lua/claudinho/diff.lua`: new `M.rejected_response(tab_name)`; `_resolve_diff_as_rejected` uses it (same content).
+  - Tests: new `tests/unit/diff_routing_spec.lua` (10: active and no-tab clients open at once; a background client waits, is marked and notified; opens in order on activation; reject answers `DIFF_REJECTED`; `reject_all_pending` across tabs; immediate resolve on open; tab exit drops with no answer); new `tests/integration/diff_routing_spec.lua` (4, two real tabs with one `ws_client` each: a background `openDiff` waits and opens on activation; accept/reject answers only the asking client; close-all rejects a waiting diff; `getOpenEditors` answers a background tab). Existing diff specs unchanged and green.
+- **Decisions:**
+  - `gate_diff` returns `"open"` or `"reject"` and yields only when the client's tab is not the active one; without a coroutine, with no owning tab, or with a closing tab it returns `"open"`.
+  - The first yield makes the server register the call as deferred under `tostring(co)`. `resume_waiting` resumes waiting coroutines with `"open"` or `"reject"`; if the handler finishes on that resume (rejected, or a diff that resolved at once) it sends the response through `_G.claude_deferred_responses[tostring(co)]` with `tools.build_response`; if the handler yields again (diff open, waiting for the user), `diff.lua`'s resolution callback answers as before. A missing sender is ignored.
+  - `session.close` still resumes with `"reject"` and sends nothing (the server stop drops the keys and the client is gone).
+  - The pending entry's path and the notice use `params.new_file_path`; the notice is `notify.info("Claude <n>: pending diff for <path>")` with `fnamemodify(path, ":~:.")`, once per request.
+  - `diff.lua` still knows nothing about tabs. The bar's diff mark already derives from `#s.pending_diffs`.
+  - Rule 40 (process death discards pending diffs) was already in `session.lua`'s `handle_exit`.
+  - Task 12 must call `sessions.reject_all_pending("user command")` from the new `:Claudinho close-all-diffs` (the old command in `init.lua` is not wired yet).
+  - Checks (test-runner): `check` and `format-check` green; `unit` (`BUSTED_SEED=12345 CI=true`) 1937 / 0 / 0 / 35 (636 s; +10, +1 pending); `integration` (Neovim 0.12.3 through `mise exec`) 37 files, 578 passed, plus only the known `claude_stub_spec` failure.
+- **Assumptions:** the pending entry's `path` is `new_file_path` (the spec does not say which).
+- **Approved scope:** none.
+- **Migrations / env vars:** none.
+- **Docs pending:** `ARCHITECTURE.md` and `PROTOCOL.md` (Task 20): `openDiff` routing by tab (`gate_diff`, `pending_diffs`, a reject answers `DIFF_REJECTED` without a window), rules 31 to 36. `CHANGELOG.md` Unreleased (Task 19): diffs from a background tab wait until the tab is activated.
+- **Manual checks:** with two tabs, a diff requested by tab 1 while tab 2 is active opens no window, tab 1 shows the diff mark, and with `notify = true` the notice appears once; switching to tab 1 opens it and clears the mark. Accept or reject it after switching to tab 2: the answer reaches only tab 1. A diff waiting in a background tab, then tab-close or close-all-diffs: rejected, no window, mark gone.

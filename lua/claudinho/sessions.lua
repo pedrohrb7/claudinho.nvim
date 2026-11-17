@@ -98,6 +98,28 @@ local function owns(s)
   return type(s) == "table" and M.state.tabs[s.number] == s
 end
 
+---Resume the coroutine of a waiting diff. The tool call it belongs to has already been answered "deferred" by the
+---server, so when the handler ends on this resume (a rejected diff, or a diff that resolved at once) the response goes
+---out through the sender the server left for it. A handler that yields again waits for the user, as `openDiff` does.
+---@param co thread
+---@param verdict "open"|"reject"
+---@return boolean ok
+---@return any err
+local function resume_waiting(co, verdict)
+  local ok, value, err = coroutine.resume(co, verdict)
+  if coroutine.status(co) == "dead" then
+    local senders = _G.claude_deferred_responses
+    local key = tostring(co)
+    local send = type(senders) == "table" and senders[key] or nil
+    if send then
+      senders[key] = nil
+      local response = require("claudinho.tools.init").build_response(ok, value, err)
+      send(response.error and response or response.result)
+    end
+  end
+  return ok, ok and nil or value
+end
+
 ---Answer "reject" to the diffs of a tab that wait for it to become active, and forget them.
 ---@param s ClaudinhoSession
 ---@return integer count
@@ -107,7 +129,7 @@ local function reject_waiting(s)
   local count = 0
   for _, pending in ipairs(waiting) do
     if type(pending.co) == "thread" and coroutine.status(pending.co) == "suspended" then
-      local ok, err = coroutine.resume(pending.co, "reject")
+      local ok, err = resume_waiting(pending.co, "reject")
       if ok then
         count = count + 1
       else
@@ -124,7 +146,7 @@ local function open_pending(s)
   while s.pending_diffs[1] do
     local pending = table.remove(s.pending_diffs, 1)
     if type(pending.co) == "thread" and coroutine.status(pending.co) == "suspended" then
-      local ok, err = coroutine.resume(pending.co, "open")
+      local ok, err = resume_waiting(pending.co, "open")
       if not ok then
         logger.error("sessions", "A pending diff of " .. label(s.number) .. " failed to open: " .. tostring(err))
       end
@@ -317,7 +339,33 @@ function M.reject_all_pending(_reason)
   for _, n in ipairs(numbers()) do
     count = count + reject_waiting(M.state.tabs[n])
   end
+  if count > 0 then
+    redraw()
+  end
   return count
+end
+
+---Decide what an `openDiff` of a client does now (rules 31 and 32). A client of the active tab, or of no tab, goes on
+---at once. A client of a tab in the background is put in the tab's list, the bar marks it, one notification says so,
+---and the tool call waits (it must run in a coroutine) until the tab is activated ("open") or the diff is dropped
+---("reject").
+---@param client table|nil
+---@param params { tab_name: string, new_file_path: string }
+---@return "open"|"reject" verdict
+function M.gate_diff(client, params)
+  local s = M.for_client(client)
+  if not s or M.state.active == s.number or s.closing then
+    return "open"
+  end
+  local co, is_main = coroutine.running()
+  if not co or is_main then
+    return "open"
+  end
+  local path = params.new_file_path
+  s.pending_diffs[#s.pending_diffs + 1] = { tab_name = params.tab_name, path = path, co = co }
+  notify.info(("%s: pending diff for %s"):format(label(s.number), vim.fn.fnamemodify(path, ":~:.")))
+  redraw()
+  return coroutine.yield() == "reject" and "reject" or "open"
 end
 
 ---Reject every diff, open and waiting, and wait for the answers to leave the servers. The sessions stay alive.
