@@ -1,7 +1,7 @@
 # UI base: janela do Claude com abas de sessão
 
 - **Date:** 2026-11-12
-- **Status:** Approved
+- **Status:** Implemented
 - **Spec:** [spec.md](spec.md)
 - **Addendum 2026-11-12:** rótulos e mensagens do plugin em inglês, pela decisão de idioma da Fase 0 ([fork-limpo](../fork-limpo/plan.md)). Ver [Addendum](#addendum-2026-11-12-idioma-da-interface).
 - **Addendum 2026-11-12:** Neovim mínimo 0.12, decidido no `docs/PRD.md` e aplicado pela Fase 0 ([fork-limpo](../fork-limpo/plan.md)). Ver [Addendum](#addendum-2026-11-12-neovim-mínimo-012).

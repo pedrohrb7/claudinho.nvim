@@ -1,7 +1,7 @@
 # UI base: janela do Claude com abas de sessão - spec técnica
 
 - **Date:** 2026-11-15
-- **Status:** In progress
+- **Status:** Implemented
 - **Plan:** [plan.md](plan.md)
 - **Decisões de 2026-11-15:** as cinco Open questions da primeira versão desta spec foram decididas pelo usuário, todas com a recomendação, e registradas no [adendo (2) do plano](plan.md#addendum-2026-11-15-2-revisão-da-spec) (errata da regra 89 e regras 90 a 97); ver [Open questions](#open-questions).
 - **Adendo de 2026-11-17:** layout `left` (regras 98 a 103 do [adendo do plano](plan.md#addendum-2026-11-17-layout-left)), na seção 15 do Design e na Task 23; o registro do que mudou está em [Addendum 2026-11-17](#addendum-2026-11-17-layout-left).
@@ -975,7 +975,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** nenhum arquivo do repo (resultados no `log.md`)
 - **Depends on:** Task 17, Task 18, Task 19, Task 20
 - **Done when:** `all` verde; `integration` verde no 0.12.3 e no 0.12.0 (`on-demand`), com o plenary no SHA do CI; os comandos de critério da Verificação só mostram as exceções; o log tem a tabela antes/depois (testes por estado, cobertura total e por arquivo, tempo do relay) explicando cada diferença pelos testes novos e pelos de "Testes que saem"; o usuário fez o roteiro manual inteiro e o resultado de cada passo está no log; `git status docs/backlog` sem entrada nova
-- **Status:** pending
+- **Status:** done
 
 ### Task 22 - Fechamento: release 0.2.0
 
