@@ -983,7 +983,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `docs/features/base-ui/plan.md`, `docs/features/base-ui/spec.md`, `docs/features/README.md`, `VERSION`, `CHANGELOG.md`
 - **Depends on:** Task 21
 - **Done when:** o trabalho da feature está commitado no `main` com autorização do usuário (mensagens Conventional Commits); plano e spec em `Implemented` e o Index atualizado, também commitados; `mise run release minor --dry-run` mostra `0.2.0`; `mise run release minor` gravou `0.2.0` no `VERSION`, transformou o Unreleased em `## [0.2.0] - <data>`, fez o commit `chore(release): 0.2.0` e criou a tag local `v0.2.0`; o push (`git push origin main v0.2.0`) fica com o usuário (regras 78 e 79)
-- **Status:** pending
+- **Status:** done
 
 ## Verification
 
