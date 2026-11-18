@@ -11,17 +11,25 @@ Claudinho.nvim is a hard fork of [claudecode.nvim](https://github.com/coder/clau
 ### Added
 
 - The `left` layout: `window.layout = "left"` opens the Claude window on the left edge, over the whole height, beside every editor split. It is the mirror of `right` and has its own sizes, `window.left.width` and `window.left.diff_width` (both validated whatever layout is in use). The default layout is still `right`.
+- Claude tabs: each tab is one `claude` process with its own WebSocket server, auth token, lock file and tab folder (the `:pwd` at creation). Open them with `:Claudinho new`, switch with `tab <n>`, `tab-next` and `tab-prev`, close with `tab-close`, restart an ended one with `tab-restart` and stop them all with `kill-all`. An ended tab stays until it is restarted or closed. All tabs are stopped when Neovim exits.
+- The Claude window, one for the whole Neovim, in one of five layouts set by `window.layout`: `right` (default), `left`, `bottom`, `float` or `tab`. Hiding the window never stops a tab. A tab bar in the window's winbar shows the tabs with the title Claude sets, a mark for a diff that waits and `[exited]` for an ended process; a click on a tab activates it and a click on `+` opens a new one.
+- The `window` config section: `layout`, `right.width`, `right.diff_width`, `left.width`, `left.diff_width`, `bottom.height`, `float.width`, `float.height` and `tab_title_max`. A wrong value falls back to the default.
+- The status of the active tab in the Claude window's statusline: model, effort and permission mode, read from the settings that each session passes to `claude` (see Changed).
+- The whole API is now one command, `:Claudinho <subcommand>`: `toggle` (also what `:Claudinho` does alone), `open`, `hide`, `focus`, `new`, `tab <n>`, `tab-next`, `tab-prev`, `tab-close [n]`, `tab-restart <n>`, `kill-all`, `send`, `add <file> [start] [end]`, `tree-add`, `send-text <text>`, `diff-accept`, `diff-deny`, `close-all-diffs` and `select-model`. The command has completion for the subcommands, the tab numbers and files.
+- `keymaps = { preset = true }` maps the `<leader>a*` keys to the subcommands (20 keys; `<leader>as` in Visual mode). A key that is already mapped is left alone, with a notice when `notify = true`. Nothing is mapped by default.
+- `notify` (default `false`): informative notices, such as the keymap and removed-key warnings, show only when it is `true`. Warnings and errors always show.
 
 ### Changed
 
-- The whole API is now one command, `:Claudinho <subcommand>`: `toggle` (also what `:Claudinho` does alone), `open`, `hide`, `focus`, `new`, `tab <n>`, `tab-next`, `tab-prev`, `tab-close [n]`, `tab-restart <n>`, `kill-all`, `send`, `add <file> [start] [end]`, `tree-add`, `send-text <text>`, `diff-accept`, `diff-deny`, `close-all-diffs` and `select-model`. The command has completion for the subcommands, the tab numbers and files.
 - `send`, `add`, `tree-add` and `send-text` act on the active Claude tab. With no tab, `send`, `add` and `tree-add` start the first one and deliver when it connects; with the active tab ended, they reply `Claude <n> has exited; run :Claudinho tab-restart <n>` and send nothing.
 - `:Claudinho close-all-diffs` also rejects the diffs that wait for a tab in the background. Its summaries are informative notices, shown with `notify = true`; its warnings and `No Claude diffs to close` always show.
+- One server and one lock file per tab, instead of one per Neovim. The lock file's `ideName` is `Neovim (Claudinho <n>)`, so each tab shows on its own in the `/ide` list of the Claude CLI.
+- Each session starts `claude` with `--settings <file>`: a private file in Neovim's temporary folder (mode 0600) with a `statusLine` and the `SessionStart`, `UserPromptSubmit` and `Stop` hooks, which report the model, effort, permission mode and session id back to the tab's server. Nothing is written to `~/.claude/` or to the project's `.claude/`.
+- A diff asked by a tab that is not active waits until that tab is activated; `close-all-diffs` and exiting Neovim reject it.
 - `setup()` starts no server, process or lock file: each tab starts its own. It enables the selection tracking (`track_selection`), the tab cleanup on exit and the commands.
 - `:checkhealth claudinho` reports each tab (process, port, clients, lock file), says when no tab is open and when informative notifications are off. The terminal provider check is gone.
 - `terminal.lua` is now a facade over the active tab (`setup`, `get_active_terminal_bufnr`, `ensure_visible`, `open`, `send_to_terminal`).
 - The log context of the send commands is now `Claudinho send`, `Claudinho add` and so on (it was `ClaudeCodeSend`, `ClaudeCodeAdd`...), also in the `context` field of `User ClaudinhoSendComplete`.
-- `keymaps = { preset = true }` maps the `<leader>a*` keys to the subcommands (20 keys; `<leader>as` in Visual mode). A key that is already mapped is left alone, with a notice when `notify = true`. Nothing is mapped by default.
 - A diff reads the Claude window's size from `window.right.width` and `window.right.diff_width` (they replace `terminal.split_width_percentage` and `terminal.diff_split_width_percentage`). Only the `right` and `left` layouts are resized while a diff is open; the Claude window has a fixed width, so the other windows of the tab share the rest equally, and the diff keeps at least a third of the screen. A diff that opens in a new tab puts the Claude window to the right, to the left with `window.layout = "left"`, or below with `window.layout = "bottom"`.
 - Removed config keys warn only with `notify = true` (read as given, before the config is merged), and `:checkhealth claudinho` lists each one the config still has. `terminal.provider` is a removed key with any value (`"snacks"` no longer becomes `"native"`).
 - New tabs always start in Neovim's current directory (`:pwd`).
@@ -30,6 +38,7 @@ Claudinho.nvim is a hard fork of [claudecode.nvim](https://github.com/coder/clau
 ### Fixed
 
 - A key typed in a Claude terminal whose process just ended no longer wipes its buffer and closes the tab, and wiping the buffer of a tab no longer raises `E937: Attempt to delete a buffer that is in use`.
+- `:wqa` with running Claude tabs no longer stops with `E948: Job still running`: on `ExitPre` the plugin answers the pending diffs and stops the tab processes.
 
 ### Removed
 

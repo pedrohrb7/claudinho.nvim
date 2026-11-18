@@ -943,7 +943,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `README.md`, `README.en.md`
 - **Depends on:** Task 16
 - **Done when:** a linha de READMEs da seção 14 está aplicada nas duas línguas, com as mesmas seções, incluindo as notas das regras 92 (conexão automática e `CLAUDE_CODE_AUTO_CONNECT_IDE=0`) e 97 (linhas iguais no `/ide`) e as seis chaves de diretório fora da configuração e listadas entre as removidas (regra 95); o layout `left` e as chaves `window.left.width` e `window.left.diff_width` documentados, com a migração de `terminal.split_side = "left"` (adendo 2026-11-17); todo subcomando, chave e padrão citado bate com `commands.lua` e `config.lua`; a atribuição ao upstream continua; sem travessão; `format` verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 18 - CLAUDE.md
 
@@ -951,7 +951,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `CLAUDE.md`
 - **Depends on:** Task 16
 - **Done when:** a linha de `CLAUDE.md` da seção 14 está aplicada; nenhum caminho citado deixou de existir; `## Test suites` e `## Workflow` iguais; `format` verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 19 - CHANGELOG.md e conferência do LICENSE
 
@@ -959,7 +959,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `CHANGELOG.md`
 - **Depends on:** Task 16
 - **Done when:** `## [Unreleased]` tem Added (abas, janela e layouts, incluindo o `left` e `window.left` do adendo 2026-11-17, status, `:Claudinho`, preset, `notify`), Changed (um servidor e lock file por aba, `ideName`, claudecode.nvim só aviso, `--settings` por sessão) e Removed (`:ClaudeCode*`, providers, chaves da seção 4), em inglês; a linha do hard fork continua; o `LICENSE` tem o aviso da Coder e a linha do fork, sem mudança; `format` verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 20 - PROTOCOL.md e ARCHITECTURE.md
 
@@ -967,7 +967,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `PROTOCOL.md`, `ARCHITECTURE.md`
 - **Depends on:** Task 16
 - **Done when:** a linha de `PROTOCOL.md`/`ARCHITECTURE.md` da seção 14 está aplicada; o texto do upstream fora da nota e da seção nova não muda; `format` verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 21 - Verificação final e medição
 

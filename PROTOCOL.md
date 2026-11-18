@@ -1,4 +1,4 @@
-This document describes the upstream claudecode.nvim at commit d123707 and may diverge from what Claudinho.nvim builds (for example, the snacks terminal provider was removed in 0.1.0).
+This document describes the upstream claudecode.nvim at commit d123707 and may diverge from what Claudinho.nvim builds. Claudinho runs one WebSocket server and one lock file per Claude tab, with `ideName` `Neovim (Claudinho <n>)`, serves the `POST /claudinho/*` routes for the status line and hooks relay, and no longer ships the snacks terminal provider (removed in 0.1.0). The text below is the upstream text; see the section "Claudinho: sessions per tab" at the end for what changed.
 
 # How Claude Code IDE Extensions Actually Work
 
@@ -621,3 +621,14 @@ The WebSocket MCP variant is currently Claude-specific, but the concepts could b
 - [MCP Specification](https://spec.modelcontextprotocol.io)
 - [Claude Code Neovim Implementation](https://github.com/coder/claudecode.nvim)
 - [Official VS Code Extension](https://github.com/anthropic-labs/vscode-mcp) (minified source)
+
+## Claudinho: sessions per tab
+
+Claudinho.nvim differs from the protocol described above in these points. Everything else in this document applies as written.
+
+- **One server and one lock file per Claude tab.** Each tab starts its own WebSocket server on its own port with its own auth token (32 hex characters) and writes its own lock file. `pid` is the Neovim PID (the same in every tab), `workspaceFolders` starts with the tab's folder, and `ideName` is `Neovim (Claudinho <n>)`. The tab's process gets `CLAUDE_CODE_SSE_PORT`, `ENABLE_IDE_INTEGRATION`, `FORCE_CODE_TERMINAL`, `CLAUDINHO_PORT` and `CLAUDINHO_TOKEN` in its own job environment only, never in `vim.env`. The tab connects to its own lock file, and its `/ide` lists only the lock files of this Neovim.
+- **A claude started outside Neovim** connects to a tab only if the CLI's own auto connect is on (`autoConnectIde`, `--ide` or `CLAUDE_CODE_AUTO_CONNECT_IDE=1`) and the tab's folder is the only one that contains its cwd. Such a client is treated as a client of that tab. `CLAUDE_CODE_AUTO_CONNECT_IDE=0` avoids it.
+- **Tool calls follow the tab.** A client's tool calls and answers go through the server it connected to. The selection and `at_mentioned` notifications go to the active tab only. An `openDiff` call from a tab in the background waits, in the tab's list, until the tab is activated; if the tab closes or Neovim exits first, the call answers `DIFF_REJECTED` without opening a window.
+- **`POST /claudinho/statusline` and `POST /claudinho/hook`.** Not part of the MCP protocol: the way a tab learns the model, effort, permission mode and session id from the Claude process. A connection whose first line starts with `POST ` is an HTTP client, never a WebSocket client (it is not in `broadcast` nor in the client count). Requests carry `Content-Type: application/json`, a required `Content-Length` and the header `X-Claudinho-Token` with the tab's token (compared in constant time). The answer is `204 No Content` with `Connection: close`, also for a body that is not valid JSON. Errors: `401` for a missing or wrong token, `400` for a missing `Content-Length` or headers over 8 KiB, `413` for a body over 1 MiB, `404` for any other path.
+- **Session settings file.** The tab's process starts with `--settings <file>`, a `0600` file in Neovim's temporary folder (never in `~/.claude/` nor in the project's `.claude/`). It sets only `statusLine` and `hooks` (`SessionStart`, `UserPromptSubmit`, `Stop`, all `async`), all running `nvim --clean -l <relay> statusline|hook`. The user's own `statusLine` is overridden in that session, and their hooks and other settings keep working. The file is removed when the tab ends.
+- **Relay (`sources/relay.lua`).** Reads stdin and posts it to `127.0.0.1:$CLAUDINHO_PORT`, waiting at most 500 ms. It always exits 0. For `statusline` it prints an empty line before any network call; `hook` writes nothing to stdout nor stderr. A missing or invalid `CLAUDINHO_PORT` makes it exit 0 without a request.

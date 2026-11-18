@@ -4,11 +4,11 @@ Context for Claude Code when working in this repository.
 
 ## Vision
 
-claudinho.nvim is a clean fork of claudecode.nvim: a pure Lua Neovim plugin, with no dependencies, that speaks the same WebSocket MCP protocol as Anthropic's official IDE extensions. Claude Code CLI finds Neovim through a lock file in `~/.claude/ide/`, then calls the plugin's tools (open files, diffs, selections, diagnostics). The terminal is Neovim's native one, or an external app, or none.
+claudinho.nvim is a clean fork of claudecode.nvim: a pure Lua Neovim plugin, with no dependencies, that speaks the same WebSocket MCP protocol as Anthropic's official IDE extensions. Claude Code CLI finds Neovim through a lock file in `~/.claude/ide/`, then calls the plugin's tools (open files, diffs, selections, diagnostics). Each Neovim tab runs its own Claude session (its own server, lock file and `claude` process), shown in a Claude window with a tab bar, status line and the layouts (`right`, `left`, `bottom`, `float`, `tab`).
 
 - Requires Neovim >= 0.12.
-- The plugin refuses to run when claudecode.nvim is loaded (`g:loaded_claudecode`): both register the same `:ClaudeCode*` commands.
-- The MCP server name is `claudinho-nvim`. Commands keep the `ClaudeCode*` names.
+- claudecode.nvim installed alongside is only a warning: both plugins run (`conflict.lua`; the warning shows once per session and only with `notify = true`), and removing claudecode.nvim is recommended.
+- The MCP server name is `claudinho-nvim`. There is one command, `:Claudinho <subcommand>`; the `:ClaudeCode*` commands and the terminal providers are gone.
 - `docs/PRD.md` has the product decisions; `PROTOCOL.md` and `ARCHITECTURE.md` describe the protocol and the design.
 
 ## Commands
@@ -26,13 +26,19 @@ The toolchain comes from [mise](https://mise.jdx.dev) (`mise.toml`). `mise run <
 
 ## Structure
 
-- `plugin/claudinho.lua` - loader: version check, conflict check, optional auto setup
-- `lua/claudinho/` - the plugin
-  - `init.lua`, `config.lua`, `conflict.lua`, `health.lua`
-  - `server/` - WebSocket server (TCP, handshake, frames, clients)
+- `plugin/claudinho.lua` - loader: version check, load guard, optional auto setup (`vim.g.claudinho_auto_setup`)
+- `lua/claudinho/` - the plugin; modules derived from claudecode.nvim start with an `-- Origin:` line
+  - `init.lua`, `config.lua`, `conflict.lua`, `health.lua`, `notify.lua`
+  - `commands.lua` - the `:Claudinho` command, its completion and the optional key preset
+  - `sessions.lua` - registry of the per-tab sessions, active tab, routing, autocmds (`ExitPre`, then `VimLeavePre`)
+  - `session.lua` - one session: server, lock file, settings and `claude` process (all-or-nothing start, restart, close order); the job gets its env vars only in its env and starts from argv, not a shell
+  - `session_settings.lua`, `sources/relay.lua`, `sources/session_data.lua` - the per-session settings file, the relay script (always exits 0) and the parsing of the status line and hook JSON
+  - `mention_queue.lua` - @-mention queue, one per server instance
+  - `server/` - WebSocket server, one instance per session (`new`, `for_client`, `drain`; TCP, handshake, frames, clients, `http.lua` for the `POST /claudinho/*` routes, `mock.lua`)
   - `tools/` - MCP tools
-  - `terminal/` and `terminal.lua` - native, external and none providers
-  - `diff.lua`, `diff_inline.lua`, `selection.lua`, `lockfile.lua`
+  - `ui/` - `window.lua` (layouts, winbar, statusline), `tabbar.lua` and `status.lua` (pure functions)
+  - `terminal.lua` - facade over the active tab's terminal; `terminal/paste_fix.lua` - streamed-paste shim
+  - `diff.lua`, `diff_inline.lua`, `selection.lua`, `lockfile.lua`, `integrations.lua`, `visual_commands.lua`
 - `tests/` - `unit/`, `integration/`, `mocks/`, `helpers/`, plus `minimal_init.lua` and `busted_setup.lua`
 - `fixtures/` - Neovim configs per file explorer (`netrw`, `nvim-tree`, `oil`, `mini-files`); `source fixtures/nvim-aliases.sh` then `vv <config>`
 - `scripts/` - test runner and helper scripts
