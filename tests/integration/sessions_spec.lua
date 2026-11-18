@@ -205,4 +205,22 @@ describe("sessions", function()
     end, 20))
     assert.same({}, lock_files())
   end)
+
+  it("ExitPre stops the processes of the tabs, so :wqa finds no running job", function()
+    sessions.setup_autocmds()
+    local first = assert(sessions.new())
+    local second = assert(sessions.new())
+    local pids = { first.pid, second.pid }
+
+    vim.api.nvim_exec_autocmds("ExitPre", { modeline = false })
+
+    for _, pid in ipairs(pids) do
+      assert.is_true(vim.wait(3000, function()
+        return not alive(pid)
+      end, 20))
+    end
+    -- The tabs stay registered until VimLeavePre closes them.
+    assert.equals(first, sessions.state.tabs[1])
+    assert.equals(second, sessions.state.tabs[2])
+  end)
 end)

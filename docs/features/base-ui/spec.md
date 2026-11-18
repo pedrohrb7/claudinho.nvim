@@ -927,7 +927,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `tests/integration/criteria_tabs_ws_spec.lua`, `tests/integration/criteria_cycles_spec.lua`, `tests/integration/criteria_exit_spec.lua`, `tests/integration/criteria_isolation_spec.lua`, `tests/helpers/**`
 - **Depends on:** Task 13, Task 14, Task 23
 - **Done when:** o `criteria_isolation_spec` mede "nada muda fora das sessões do plugin" com o `claude` stub, como o adendo (2) do plano define; os quatro specs da tabela de Testing passam no 0.12.3, cada um em menos de 40 s; um defeito de código achado aqui vira pedido de escopo registrado no log, não mudança silenciosa; gate verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 16 - Linhas de origem nos módulos
 

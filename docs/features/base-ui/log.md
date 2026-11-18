@@ -408,3 +408,30 @@ Mode: tasks selected by the user (Task 23 only), same gate policy as the earlier
 - **Review (code-reviewer):** ship; fixed in the same round: a geometry case "right ignores window.left.width", `resolve_split_width_percentage` local renamed to `side`, `sized_side` uses `window_layout()`, the `window.right`/`window.left` validation is a local function `normalize_side` (as section 15 says).
 - **Final gate (test-runner):** `check` 0 / 0 in 208 files; `format-check` green; `unit` (`BUSTED_SEED=12345 CI=true`) 1917 / 0 / 0 / 34 (514 s); `integration` (Neovim 0.12.3) 36 files, 583 passed, 1 failed: `tests/integration/session_spec.lua:84`, which reads `CLAUDINHO_PORT` inherited from the caller's shell (passes 9 / 0 with the `CLAUDINHO_*` vars unset). Registered in `docs/backlog/bugs/2026-11-17-session-spec-depends-on-caller-env.md`. The known `claude_stub_spec` failure passed in this run.
 - **Backlog:** `docs/backlog/bugs/2026-11-17-unified-diff-does-not-resize-claude-window.md` (low), `docs/backlog/bugs/2026-11-17-session-spec-depends-on-caller-env.md` (medium).
+
+### Task 15 - Critérios de sucesso como testes de integração (done)
+
+- **Files:**
+  - `tests/helpers/criteria.lua`: shared helper; the real `require("claudinho").setup` with the stub by absolute path (`tests/bin/claude`), option `claude_dir_in_home`, tree/SHA snapshots and WebSocket message waiters.
+  - `tests/helpers/criteria_exit_child.lua`: child Neovim script (three stub tabs, a pending diff, exit command driven by files).
+  - `tests/integration/criteria_tabs_ws_spec.lua` (4): selection, current selection on tab switch, @-mention, external client drops with its tab.
+  - `tests/integration/criteria_cycles_spec.lua` (4): 10 cycles each of hide/open, toggle, tab switching and layout changes (right, bottom, float, tab, left).
+  - `tests/integration/criteria_exit_spec.lua` (3): `:qa`, `:wqa` and `:q` on the last window, in a child Neovim.
+  - `tests/integration/criteria_isolation_spec.lua` (3): SHA of `HOME` and the project `.claude/` unchanged, a foreign lock kept, plugin env only in tab processes.
+  - `lua/claudinho/sessions.lua`: the `ExitPre` handler in `setup_autocmds` also calls `jobstop` on every tab's job after rejecting the diffs; tabs stay registered and `VimLeavePre` is unchanged (approved scope, see below).
+  - `tests/unit/sessions_spec.lua`: case "ExitPre stops the process of every tab with a job". `tests/integration/sessions_spec.lua`: case "ExitPre stops the processes of the tabs, so :wqa finds no running job".
+- **Decisions:**
+  - The specs never use a bare `claude`, so the claude_stub PATH bug cannot affect them; the child Neovim runs with `clear_env` and gets only `PATH`, `HOME`, `CLAUDE_CONFIG_DIR`, `TMPDIR`, `XDG_*` and `CLAUDINHO_*`.
+  - Fresh `claudinho.*` modules per test and full teardown (`kill_all`, `selection.disable`, `window.teardown`, augroup).
+  - The selection is triggered with `selection.update_selection()` after moving the cursor, not through the debounce autocmds.
+  - `criteria_cycles` also cycles the layout: the plan criterion mentions layout, the spec table does not.
+  - `criteria_isolation` puts `CLAUDE_CONFIG_DIR` at `HOME/.claude`, so the snapshot covers `settings.json`, `.claude.json`, `ide/` with a foreign lock (a living pid) and the project `.claude/`; it clears `CLAUDE_CODE_SSE_PORT`, `CLAUDINHO_PORT` and `CLAUDINHO_TOKEN` around each test (see the session-spec-depends-on-caller-env bug).
+  - The `:wqa` scenario leaves a modified file buffer so `:wqa` has something to write; the check for 0 settings files looks in a private `TMPDIR`.
+  - `ExitPre` stops the jobs but does not close the sessions: the existing case that `ExitPre` leaves sessions alive still holds. A late job-exit event may show a "Claude n exited" notice at exit (harmless).
+- **Assumptions:** the half of the criterion about an external claude not connecting by itself needs the real CLI; it stays in manual scripts 10 and 18.
+- **Approved scope:** `lua/claudinho/sessions.lua`, `tests/unit/sessions_spec.lua`, `tests/integration/sessions_spec.lua` (2026-11-17, user). Defect found by `criteria_exit_spec`: with a running tab, `:wqa` stopped with `E948: Job still running (add ! to end the job)` and Neovim stayed open (rule 46), because the tab jobs were killed only on `VimLeavePre`, after Neovim's own job check. Confirmed in plain Neovim 0.12.3: an `ExitPre` autocmd that calls `jobstop` makes the same `:wqa` exit 0.
+- **Migrations / env vars:** none.
+- **Docs pending:** `ARCHITECTURE.md` (Task 20): `ExitPre` rejects diffs and stops the tab processes, `VimLeavePre` closes the sessions. `CHANGELOG.md` Unreleased (Task 19): fix for `:wqa` with running Claude tabs (E948).
+- **Manual checks:** `:wqa` in a real Neovim with 2 or more Claude tabs and a modified buffer: no E948, the buffer is written, no claude process or lock file left.
+- **Out of scope:** none.
+- **Checks (test-runner):** `check` 0 / 0 in 216 files; `format-check` green (296 files, 0 changed); `unit` 1927 / 0 / 0 / 39 (640 s); `integration` (Neovim 0.12.3) 601 passed, 1 failed: `tests/integration/claude_stub_spec.lua:14`, pre-existing and registered (`docs/backlog/bugs/2026-11-16-claude-stub-path-first-entry-integration.md`). Criteria times in isolation: cycles 0.3 s, exit 0.4 s, isolation 0.9 s, tabs_ws 3.4 s.

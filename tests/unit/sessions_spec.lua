@@ -760,6 +760,24 @@ describe("sessions", function()
       assert.equals(s, sessions.state.tabs[1])
     end)
 
+    it("ExitPre stops the process of every tab with a job, so :wqa meets no running job", function()
+      local first = assert(sessions.new())
+      local second = assert(sessions.new())
+      first.job, second.job = 11, 12
+      local stopped = {}
+      stub(vim.fn, "jobstop", function(job)
+        table.insert(stopped, job)
+        return 1
+      end)
+      sessions.setup_autocmds()
+
+      callback_of("ExitPre")()
+
+      assert.same({ 11, 12 }, stopped)
+      assert.equals(first, sessions.state.tabs[1])
+      assert.equals(second, sessions.state.tabs[2])
+    end)
+
     it("VimLeavePre does the rest of kill_all", function()
       sessions.new()
       sessions.new()

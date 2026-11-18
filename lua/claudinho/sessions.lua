@@ -490,11 +490,19 @@ end
 ---The autocmds that end the tabs with Neovim and with their buffers (rule 46). Calling it again replaces them.
 function M.setup_autocmds()
   local group = vim.api.nvim_create_augroup(AUGROUP, { clear = true })
-  -- `ExitPre` comes before Neovim leaves, while the sessions are alive: the diffs answer and the writes go out.
+  -- `ExitPre` comes before Neovim leaves, while the sessions are alive: the diffs answer and the writes go out. The
+  -- processes are stopped here too, after the answers: `:wqa` checks for running terminal jobs after `ExitPre` and
+  -- would stop with E948 (rule 46). The sessions stay registered; `VimLeavePre` closes them.
   vim.api.nvim_create_autocmd("ExitPre", {
     group = group,
     callback = function()
       reject_diffs("Neovim exiting")
+      for _, n in ipairs(numbers()) do
+        local job = M.state.tabs[n].job
+        if job then
+          pcall(vim.fn.jobstop, job)
+        end
+      end
     end,
   })
   -- The rest of the end: processes, servers, lock files and settings files.
