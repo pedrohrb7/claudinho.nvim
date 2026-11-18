@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/tools/get_diagnostics.lua (MIT, see LICENSE)
 --- Tool implementation for getting diagnostics.
 
 local schema = {

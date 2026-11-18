@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/visual_commands.lua (MIT, see LICENSE)
 ---Visual command handling module for Claudinho.nvim
 ---Implements neo-tree-style visual mode exit and command processing
 ---@module 'claudinho.visual_commands'

@@ -421,7 +421,7 @@ Mode: tasks selected by the user (Task 23 only), same gate policy as the earlier
   - `lua/claudinho/sessions.lua`: the `ExitPre` handler in `setup_autocmds` also calls `jobstop` on every tab's job after rejecting the diffs; tabs stay registered and `VimLeavePre` is unchanged (approved scope, see below).
   - `tests/unit/sessions_spec.lua`: case "ExitPre stops the process of every tab with a job". `tests/integration/sessions_spec.lua`: case "ExitPre stops the processes of the tabs, so :wqa finds no running job".
 - **Decisions:**
-  - The specs never use a bare `claude`, so the claude_stub PATH bug cannot affect them; the child Neovim runs with `clear_env` and gets only `PATH`, `HOME`, `CLAUDE_CONFIG_DIR`, `TMPDIR`, `XDG_*` and `CLAUDINHO_*`.
+  - The specs never use a bare `claude`, so the `claude_stub` PATH bug cannot affect them; the child Neovim runs with `clear_env` and gets only `PATH`, `HOME`, `CLAUDE_CONFIG_DIR`, `TMPDIR`, `XDG_*` and `CLAUDINHO_*`.
   - Fresh `claudinho.*` modules per test and full teardown (`kill_all`, `selection.disable`, `window.teardown`, augroup).
   - The selection is triggered with `selection.update_selection()` after moving the cursor, not through the debounce autocmds.
   - `criteria_cycles` also cycles the layout: the plan criterion mentions layout, the spec table does not.
@@ -435,3 +435,17 @@ Mode: tasks selected by the user (Task 23 only), same gate policy as the earlier
 - **Manual checks:** `:wqa` in a real Neovim with 2 or more Claude tabs and a modified buffer: no E948, the buffer is written, no claude process or lock file left.
 - **Out of scope:** none.
 - **Checks (test-runner):** `check` 0 / 0 in 216 files; `format-check` green (296 files, 0 changed); `unit` 1927 / 0 / 0 / 39 (640 s); `integration` (Neovim 0.12.3) 601 passed, 1 failed: `tests/integration/claude_stub_spec.lua:14`, pre-existing and registered (`docs/backlog/bugs/2026-11-16-claude-stub-path-first-entry-integration.md`). Criteria times in isolation: cycles 0.3 s, exit 0.4 s, isolation 0.9 s, tabs_ws 3.4 s.
+
+### Task 16 - Linhas de origem nos módulos (done)
+
+- **Files:**
+  - 34 modules under `lua/claudinho/` (`*.lua`, `server/`, `terminal/`, `tools/`) and `plugin/claudinho.lua`: one added first line each, `-- Origin: coder/claudecode.nvim@d1237072, <upstream path> (MIT, see LICENSE)`; `git diff --numstat` is 1 / 0 for every file. `commands.lua`, `mention_queue.lua`, `session.lua` and `ui/window.lua` already had the line from earlier tasks (38 tagged in all); the 9 new modules of section 13 have none.
+  - `tests/unit/provenance_spec.lua` (new): checks the exact first line of the 38 tagged files, no line on the 9 new modules, and that every module under `lua/claudinho/` is in one of the two lists.
+- **Decisions:** upstream paths taken from a local checkout of coder/claudecode.nvim (file names only); `terminal.lua` maps to `lua/claudecode/terminal.lua`, `terminal/paste_fix.lua` and the 12 `tools/*.lua` to the same relative path upstream, `plugin/claudinho.lua` to `plugin/claudecode.lua`.
+- **Assumptions:** files that start with `---@brief [[` or `---@meta` (including `types.lua`) get the origin line above it, as section 13 says (first line).
+- **Approved scope:** none.
+- **Migrations / env vars:** none.
+- **Docs pending:** none.
+- **Manual checks:** none.
+- **Out of scope:** none. A later new module under `lua/claudinho/` must be classified in the provenance lists, or `provenance_spec` fails.
+- **Checks (test-runner):** `check` 0 / 0 in 217 files; `unit` 1975 / 0 / 0 / 39 (633 s); `integration` (Neovim 0.12.3) 601 passed, only the pre-existing `claude_stub_spec.lua:14` failed. `format-check` first failed on this log (an unquoted `claude_stub` in the Task 15 block, which prettier read as emphasis); fixed by the main session, then green twice.

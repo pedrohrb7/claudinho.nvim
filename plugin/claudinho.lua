@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, plugin/claudecode.lua (MIT, see LICENSE)
 if vim.fn.has("nvim-0.12") ~= 1 then
   vim.api.nvim_err_writeln("Claudinho requires Neovim >= 0.12")
   return

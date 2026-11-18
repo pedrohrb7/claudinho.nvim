@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/init.lua (MIT, see LICENSE)
 ---@brief [[
 --- Claude Code Neovim Integration
 --- This plugin integrates Claude Code CLI with Neovim, enabling

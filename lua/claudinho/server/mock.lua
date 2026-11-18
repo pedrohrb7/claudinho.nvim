@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/server/mock.lua (MIT, see LICENSE)
 ---@brief [[
 --- Mock WebSocket server implementation for testing.
 --- This module provides a minimal implementation of the WebSocket server

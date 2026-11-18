@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/terminal/paste_fix.lua (MIT, see LICENSE)
 --- Compatibility shim for a Neovim core bug (< 0.12.2) that fragments a large
 --- bracketed paste into a `:terminal` across `vim.paste` phases, so the program
 --- in the terminal sees it as N separate pastes. Coalesces the streamed phases

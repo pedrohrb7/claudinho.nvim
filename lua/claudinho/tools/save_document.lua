@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/tools/save_document.lua (MIT, see LICENSE)
 --- Tool implementation for saving a document.
 
 local schema = {

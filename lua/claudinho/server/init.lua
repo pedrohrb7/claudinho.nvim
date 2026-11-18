@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/server/init.lua (MIT, see LICENSE)
 ---@brief WebSocket server for Claude Code Neovim integration
 local claudinho_main = require("claudinho") -- Added for version access
 local logger = require("claudinho.logger")

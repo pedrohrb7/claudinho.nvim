@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/health.lua (MIT, see LICENSE)
 --- Health check for claudinho.nvim, run via :checkhealth claudinho
 --- Verifies prerequisites (Neovim version, Claude CLI) and reports the live
 --- state of each Claude tab (process, WebSocket server, lock file) without

@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/tools/close_all_diff_tabs.lua (MIT, see LICENSE)
 --- Tool implementation for closing all diff tabs.
 
 local schema = {

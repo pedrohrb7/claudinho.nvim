@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/server/handshake.lua (MIT, see LICENSE)
 ---@brief WebSocket handshake handling (RFC 6455)
 local utils = require("claudinho.server.utils")
 

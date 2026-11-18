@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/lockfile.lua (MIT, see LICENSE)
 ---@brief [[
 --- Lock file management for Claude Code Neovim integration.
 --- This module handles creation and removal of lock files

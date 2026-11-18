@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/server/client.lua (MIT, see LICENSE)
 ---@brief WebSocket client connection management
 local frame = require("claudinho.server.frame")
 local handshake = require("claudinho.server.handshake")

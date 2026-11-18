@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/tools/check_document_dirty.lua (MIT, see LICENSE)
 ---Tool implementation for checking if a document is dirty.
 
 local schema = {

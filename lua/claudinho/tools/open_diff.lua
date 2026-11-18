@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/tools/open_diff.lua (MIT, see LICENSE)
 --- Tool implementation for opening a diff view.
 
 local schema = {

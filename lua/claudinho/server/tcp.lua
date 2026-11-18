@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/server/tcp.lua (MIT, see LICENSE)
 ---@brief TCP server implementation using vim.loop
 local client_manager = require("claudinho.server.client")
 local http = require("claudinho.server.http")

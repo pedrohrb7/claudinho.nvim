@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/server/frame.lua (MIT, see LICENSE)
 ---@brief WebSocket frame encoding and decoding (RFC 6455)
 local utils = require("claudinho.server.utils")
 

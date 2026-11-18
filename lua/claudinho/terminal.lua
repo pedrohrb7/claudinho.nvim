@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/terminal.lua (MIT, see LICENSE)
 --- The terminal of the active Claude tab, seen from the rest of the plugin. Each tab is a `claudinho.session` shown in
 --- `claudinho.ui.window`; this module is only a facade over them, for the code (diff, selection, send) that wants "the
 --- Claude terminal" and does not care which tab it is.

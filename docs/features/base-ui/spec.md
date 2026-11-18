@@ -935,7 +935,7 @@ Os agentes `lua`, `test-runner` e `docs-writer` existem (usados na Fase 0). As O
 - **Files:** `lua/claudinho/**/*.lua`, `plugin/claudinho.lua`, `tests/unit/provenance_spec.lua`
 - **Depends on:** Task 15
 - **Done when:** a seção 13 está aplicada, só com a linha de comentário (nenhuma outra mudança de código: `git diff` de cada arquivo tem uma linha adicionada); `provenance_spec` passa; gate verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 17 - README.md e README.en.md
 

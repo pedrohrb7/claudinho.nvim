@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/integrations.lua (MIT, see LICENSE)
 --- Tree integration module for Claudinho.nvim
 --- Handles detection and selection of files from nvim-tree, neo-tree, mini.files, oil.nvim, and netrw
 ---@module 'claudinho.integrations'

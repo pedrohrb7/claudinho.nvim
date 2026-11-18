@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/config.lua (MIT, see LICENSE)
 ---@brief [[
 --- Manages configuration for the Claude Code Neovim integration.
 --- Provides default settings, validation, and application of user-defined configurations.

@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/selection.lua (MIT, see LICENSE)
 ---Manages selection tracking and communication with the Claude server.
 ---@module 'claudinho.selection'
 local M = {}

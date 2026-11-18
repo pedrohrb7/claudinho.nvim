@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/tools/close_tab.lua (MIT, see LICENSE)
 --- Tool implementation for closing a Claude diff by its tab name.
 
 -- Note: Schema defined but not used since this tool is internal

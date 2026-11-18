@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/tools/get_workspace_folders.lua (MIT, see LICENSE)
 --- Tool implementation for getting workspace folders.
 
 local schema = {

@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/types.lua (MIT, see LICENSE)
 ---@meta
 ---@brief [[
 --- Centralized type definitions for Claudinho.nvim public API.

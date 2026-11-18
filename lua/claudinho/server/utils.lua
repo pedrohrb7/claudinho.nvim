@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/server/utils.lua (MIT, see LICENSE)
 ---@brief Utility functions for WebSocket server implementation
 local shared_utils = require("claudinho.utils")
 

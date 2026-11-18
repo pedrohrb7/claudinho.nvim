@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/logger.lua (MIT, see LICENSE)
 ---@brief Centralized logger for Claude Code Neovim integration.
 -- Provides level-based logging.
 ---@module 'claudinho.logger'

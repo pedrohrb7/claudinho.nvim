@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/tools/get_current_selection.lua (MIT, see LICENSE)
 --- Tool implementation for getting the current selection.
 
 local schema = {

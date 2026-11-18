@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/diff_inline.lua (MIT, see LICENSE)
 --- Inline diff module for Claude Code Neovim integration.
 -- Provides a VS Code-style unified inline diff view with deleted (red/strikethrough)
 -- and added (green) lines interleaved in a single read-only buffer.

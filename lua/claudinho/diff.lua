@@ -1,3 +1,4 @@
+-- Origin: coder/claudecode.nvim@d1237072, lua/claudecode/diff.lua (MIT, see LICENSE)
 --- Diff module for Claude Code Neovim integration.
 -- Provides native Neovim diff functionality with MCP-compliant blocking operations and state management.
 local M = {}
