@@ -12,10 +12,6 @@ Claudinho.nvim is a hard fork of [claudecode.nvim](https://github.com/coder/clau
 
 - The `left` layout: `window.layout = "left"` opens the Claude window on the left edge, over the whole height, beside every editor split. It is the mirror of `right` and has its own sizes, `window.left.width` and `window.left.diff_width` (both validated whatever layout is in use). The default layout is still `right`.
 
-### Fixed
-
-- A key typed in a Claude terminal whose process just ended no longer wipes its buffer and closes the tab, and wiping the buffer of a tab no longer raises `E937: Attempt to delete a buffer that is in use`.
-
 ### Changed
 
 - The whole API is now one command, `:Claudinho <subcommand>`: `toggle` (also what `:Claudinho` does alone), `open`, `hide`, `focus`, `new`, `tab <n>`, `tab-next`, `tab-prev`, `tab-close [n]`, `tab-restart <n>`, `kill-all`, `send`, `add <file> [start] [end]`, `tree-add`, `send-text <text>`, `diff-accept`, `diff-deny`, `close-all-diffs` and `select-model`. The command has completion for the subcommands, the tab numbers and files.
@@ -30,6 +26,10 @@ Claudinho.nvim is a hard fork of [claudecode.nvim](https://github.com/coder/clau
 - Removed config keys warn only with `notify = true` (read as given, before the config is merged), and `:checkhealth claudinho` lists each one the config still has. `terminal.provider` is a removed key with any value (`"snacks"` no longer becomes `"native"`).
 - New tabs always start in Neovim's current directory (`:pwd`).
 - claudecode.nvim installed next to Claudinho is now a warning, not a refusal: both plugins run, `setup()` configures everything and `:Claudinho` exists. With `notify = true`, `[Claudinho] claudecode.nvim is also installed. Both plugins run, but Claudinho replaces it: remove claudecode.nvim.` shows once per session. `:checkhealth claudinho` shows a WARN for it, with or without `setup()`. `plugin/claudinho.lua` no longer checks for it.
+
+### Fixed
+
+- A key typed in a Claude terminal whose process just ended no longer wipes its buffer and closes the tab, and wiping the buffer of a tab no longer raises `E937: Attempt to delete a buffer that is in use`.
 
 ### Removed
 

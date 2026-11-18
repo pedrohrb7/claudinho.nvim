@@ -40,14 +40,14 @@ describe("session exit key", function()
     }
     local done = vim
       .system({
-        "nvim",
+        vim.v.progpath,
         "--headless",
         "--clean",
         "-i",
         "NONE",
         "-c",
         "luafile " .. vim.fn.fnameescape(repo .. "/tests/helpers/exit_key_child.lua"),
-      }, { text = true, env = child_env, timeout = 25000 })
+      }, { text = true, env = child_env, timeout = 10000 })
       :wait()
     local line = (done.stdout or ""):match("RESULT:(%b{})")
     assert.is_truthy(line, "the child printed no result: " .. (done.stdout or "") .. (done.stderr or ""))
@@ -56,6 +56,7 @@ describe("session exit key", function()
 
   ---@param result table
   local function assert_no_e937(result)
+    assert.is_nil(result.wipe_error, "the wipe failed: " .. tostring(result.wipe_error))
     assert.is_nil(result.messages:find("E937", 1, true), "E937 in :messages: " .. result.messages)
     assert.is_nil(result.messages:find("Error in BufWipeout", 1, true), "BufWipeout error: " .. result.messages)
     assert.is_nil(result.errmsg:find("E937", 1, true), "E937 in v:errmsg: " .. result.errmsg)

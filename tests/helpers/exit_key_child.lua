@@ -70,7 +70,8 @@ end, function(shown)
   result.initial_mode = vim.api.nvim_get_mode().mode
 
   if scenario == "wipe_running" then
-    vim.cmd("silent! bwipeout! " .. buf)
+    local wiped, wipe_err = pcall(vim.cmd, "bwipeout! " .. buf)
+    result.wipe_ok, result.wipe_error = wiped, not wiped and tostring(wipe_err) or nil
     vim.defer_fn(function()
       snapshot(buf)
       finish()
@@ -85,7 +86,8 @@ end, function(shown)
     result.reached_exited = ended
     result.mode_at_exit = vim.api.nvim_get_mode().mode
     if scenario == "wipe_ended" then
-      vim.cmd("silent! bwipeout! " .. buf)
+      local wiped, wipe_err = pcall(vim.cmd, "bwipeout! " .. buf)
+      result.wipe_ok, result.wipe_error = wiped, not wiped and tostring(wipe_err) or nil
     else
       vim.api.nvim_input("x")
     end

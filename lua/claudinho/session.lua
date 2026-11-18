@@ -449,7 +449,8 @@ function M.close(session, reason, opts)
 
   local buf, job = session.buf, session.job
   if buf_gone then
-    -- The buffer goes anyway: the job is stopped with no wait and no second delete (E937).
+    -- The buffer goes anyway: the job is stopped with no wait and no second delete (E937). The neovim/neovim#42508
+    -- wait below protects a delete of ours; Neovim is already deleting the buffer, so there is none to protect.
     if job then
       pcall(vim.fn.jobstop, job)
     end

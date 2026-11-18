@@ -708,6 +708,49 @@ describe("session", function()
       guard.callback()
       assert.equals(0, state.stopinsert)
     end)
+
+    describe("the TermClose guard", function()
+      local guard
+
+      before_each(function()
+        state.mode = "t"
+        stub(vim.api, "nvim_get_mode", function()
+          return { mode = state.mode }
+        end)
+        for _, entry in ipairs(state.autocmds) do
+          if entry.event == "TermClose" and entry.opts.buffer == session.buf then
+            guard = entry.opts
+          end
+        end
+        assert.is_not_nil(guard)
+      end)
+
+      it("leaves terminal mode when the ended terminal is the current buffer", function()
+        state.current_buf = session.buf
+        guard.callback()
+        assert.equals(1, state.stopinsert)
+      end)
+
+      it("does nothing when another buffer is current", function()
+        state.current_buf = session.buf + 100
+        guard.callback()
+        assert.equals(0, state.stopinsert)
+      end)
+
+      it("does nothing when the mode is not terminal mode", function()
+        state.current_buf = session.buf
+        state.mode = "n"
+        guard.callback()
+        assert.equals(0, state.stopinsert)
+      end)
+
+      it("does nothing when the session no longer owns the buffer", function()
+        state.current_buf = session.buf
+        session.buf = nil
+        guard.callback()
+        assert.equals(0, state.stopinsert)
+      end)
+    end)
   end)
 
   describe("restart", function()
@@ -897,6 +940,38 @@ describe("session", function()
       session_module.close(session)
 
       assert.is_false(waited)
+    end)
+
+    describe("when Neovim is already deleting the buffer", function()
+      it("stops the job with no wait and does not delete the buffer again", function()
+        local session = started()
+        local waited = false
+        stub(vim, "wait", function()
+          waited = true
+          return true
+        end)
+
+        session_module.close(session, "buffer gone", { buf_gone = true })
+
+        assert.equals(77, state.jobstopped)
+        assert.is_false(waited)
+        assert.is_nil(index_of("buf.delete"))
+        assert.same({}, state.deleted_bufs)
+        assert.is_nil(session.buf)
+        assert.equals("exited", session.state)
+      end)
+
+      it("still deletes the buffer without the option", function()
+        local session = started()
+        local buf = session.buf
+        stub(vim, "wait", function()
+          return true
+        end)
+
+        session_module.close(session, "tab closed")
+
+        assert.same({ buf }, state.deleted_bufs)
+      end)
     end)
   end)
 end)
