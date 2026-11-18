@@ -165,7 +165,7 @@ describe("TCP server disconnect handling", function()
 
       assert.is_nil(server)
       assert.is_string(err)
-      assert.equals("No free port in 10000-10002 (EADDRINUSE)", err)
+      assert.equals("No free port in 10000-10002", err)
       assert.are.equal(3, #handles) -- every candidate tried exactly once
       for _, h in ipairs(handles) do
         assert.is_true(h.closed)
@@ -182,8 +182,20 @@ describe("TCP server disconnect handling", function()
 
       assert.is_nil(server)
       assert.is_string(err)
-      assert.equals("No free port in 10000-10000 (EADDRINUSE)", err)
+      assert.equals("No free port in 10000-10000", err)
       assert.is_true(handles[1].closed)
+    end)
+
+    it("keeps the libuv code in the error when it is not EADDRINUSE", function()
+      local handles = {}
+      vim.loop.new_tcp = function()
+        return make_handle(handles, true, "EACCES: permission denied")
+      end
+
+      local server, err = tcp.create_server({ port_range = { min = 10000, max = 10000 } }, {}, nil)
+
+      assert.is_nil(server)
+      assert.equals("No free port in 10000-10000 (EACCES)", err)
     end)
 
     it("keeps the exact handle whose listen() succeeded", function()

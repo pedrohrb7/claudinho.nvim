@@ -220,6 +220,7 @@ The texts are in English, as plugin messages.
 - The status stays empty while the folder has no accepted trust in Claude, and also with `disableAllHooks` or `allowManagedHooksOnly` in the settings. Tabs work the same, only without the status.
 - With `laststatus=3`, the statusline of the Claude window only shows while it is focused; with `laststatus=0`, never.
 - Reloading the plugin modules with open tabs is not supported: the in-memory state is lost and the old tabs only close with Neovim.
+- With modified buffers, `:wqa` writes them and stops once with E948, with the tabs and diffs intact; run `:wqa` or `:qa` again to leave. `:qa` with modified buffers gives E37/E162 and keeps the tabs; `:qa!` leaves and ends the tabs.
 - The token of each tab sits in the environment of the Claude process and its children (`CLAUDINHO_TOKEN`), the same boundary as the lock file, which your user already reads.
 
 ## CLI connection and `/ide`

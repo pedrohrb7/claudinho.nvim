@@ -10,12 +10,10 @@ local M = {}
 M.TITLE = "Claudinho"
 
 ---True when the user turned informative notifications on (`notify = true`).
----Reads the config of the running plugin without loading it: an unloaded plugin has no config, so it is off.
+---Reads the config of the running plugin without loading it: before `setup` the default (off) applies.
 ---@return boolean
 local function enabled()
-  local plugin = package.loaded["claudinho"]
-  local config = type(plugin) == "table" and type(plugin.state) == "table" and plugin.state.config or nil
-  return type(config) == "table" and config.notify == true
+  return require("claudinho.config").current().notify == true
 end
 
 ---Informative notification. Shown only with `notify = true`.

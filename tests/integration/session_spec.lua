@@ -136,7 +136,7 @@ describe("session", function()
     local result = http_post.post(
       session.lock_port,
       "/claudinho/statusline",
-      '{"session_id":"sid-1","model":{"id":"claude-opus-5-5","display_name":"Opus"}}',
+      '{"session_id":"123e4567-e89b-12d3-a456-426614174001","model":{"id":"claude-opus-5-5","display_name":"Opus"}}',
       { ["X-Claudinho-Token"] = session.token, ["Content-Type"] = "application/json" }
     )
     assert.equals(204, result.status)
@@ -144,12 +144,12 @@ describe("session", function()
       return session.data.model ~= nil
     end, 10))
     assert.equals("Opus 5.5", session.data.model)
-    assert.equals("sid-1", session.data.session_id)
+    assert.equals("123e4567-e89b-12d3-a456-426614174001", session.data.session_id)
 
     http_post.post(
       session.lock_port,
       "/claudinho/hook",
-      '{"session_id":"sid-1","permission_mode":"plan"}',
+      '{"session_id":"123e4567-e89b-12d3-a456-426614174001","permission_mode":"plan"}',
       { ["X-Claudinho-Token"] = session.token, ["Content-Type"] = "application/json" }
     )
     assert.is_true(vim.wait(2000, function()

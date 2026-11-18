@@ -19,6 +19,7 @@
 
 - Visto de novo (2026-11-16, gate da Task 9 do base-ui, test-runner): no runner completo, a asserção mostrou a primeira entrada do PATH como `/home/phrb/workspaces/claudinho.nvim/tests/bin`, enquanto o valor esperado (diretório do stub calculado a partir de `debug.getinfo(1, "S").source` em `tests/integration/claude_stub_spec.lua`) fica sob `/mnt/data/workspaces/claudinho.nvim`. Os dois caminhos são o mesmo checkout: `readlink -f /home/phrb/workspaces/claudinho.nvim` resolve para `/mnt/data/workspaces/claudinho.nvim`. Rodar o arquivo direto pelo caminho `/mnt/data` passa.
 - Observação (2026-11-17, gate da Task 23 do base-ui, test-runner): o teste passou no runner completo de integração (Neovim 0.12.3). A falha é, portanto, intermitente ou dependente do caminho de execução; o entry segue Open.
+- Visto de novo (2026-11-18, gate final da Task 21 do base-ui, test-runner): na primeira execução do gate falhou com "Passed in '/home/phrb/workspaces/claudinho.nvim/tests/bin', expected '/mnt/data/workspaces/claudinho.nvim/tests/bin'". A primeira entrada do PATH era o diretório do stub do mesmo repo por outro caminho (o repo também abre como /home/phrb/workspaces/claudinho.nvim), não um `claude` real. Na reexecução o mesmo arquivo passou. Sugere que o spec compara caminhos sem resolvê-los, ou que o PATH vaza de um runner anterior.
 
 ## Steps to reproduce
 

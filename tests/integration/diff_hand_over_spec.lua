@@ -23,7 +23,7 @@ describe(":Claudinho close-all-diffs hand-over", function()
     -- The summaries of the command are informative notices, shown only with notify = true.
     real_config = require("claudinho").state.config
     require("claudinho").state.config = vim.tbl_extend("force", real_config, { notify = true })
-    _G.claude_deferred_responses = {}
+    _G.claudinho_deferred_responses = {}
     notes = {}
     real_bufload = vim.fn.bufload
     real_notify = vim.notify
@@ -40,7 +40,7 @@ describe(":Claudinho close-all-diffs hand-over", function()
     diff._cleanup_all_active_diffs("test cleanup")
     vim.cmd("silent! %bwipeout!")
     vim.fn.delete(dir, "rf")
-    _G.claude_deferred_responses = nil
+    _G.claudinho_deferred_responses = nil
   end)
 
   local function write_bytes(path, bytes)
@@ -69,7 +69,7 @@ describe(":Claudinho close-all-diffs hand-over", function()
     })
     assert.is_true(call._deferred, "openDiff waits for the user")
     local answers = {}
-    _G.claude_deferred_responses[tostring(call.coroutine)] = function(response)
+    _G.claudinho_deferred_responses[tostring(call.coroutine)] = function(response)
       answers[#answers + 1] = response
     end
     vim.api.nvim_buf_call(diff._get_active_diffs()[tab].new_buffer, function()
@@ -254,7 +254,7 @@ describe(":Claudinho close-all-diffs hand-over", function()
         },
       })
       assert.is_true(call._deferred, vim.inspect(call.error))
-      _G.claude_deferred_responses[tostring(call.coroutine)] = function() end
+      _G.claudinho_deferred_responses[tostring(call.coroutine)] = function() end
       local diff_win = diff._get_active_diffs()[tab].new_window
       vim.api.nvim_set_current_win(diff_win)
       vim.cmd("write")
@@ -295,7 +295,7 @@ describe(":Claudinho close-all-diffs hand-over", function()
       name = "openDiff",
       arguments = { old_file_path = path, new_file_path = path, new_file_contents = "x\n", tab_name = tab },
     })
-    _G.claude_deferred_responses[tostring(call.coroutine)] = function() end
+    _G.claudinho_deferred_responses[tostring(call.coroutine)] = function() end
     vim.api.nvim_buf_call(diff._get_active_diffs()[tab].new_buffer, function()
       vim.cmd("Claudinho diff-deny")
     end)

@@ -74,17 +74,9 @@ end
 
 -- Helpers -------------------------------------------------------------------------------------------------------
 
----The configuration of the running plugin, or the defaults before `setup`.
----@return ClaudinhoConfig
-local function plugin_config()
-  local plugin = package.loaded["claudinho"]
-  local config = type(plugin) == "table" and type(plugin.state) == "table" and plugin.state.config or nil
-  return config or require("claudinho.config").defaults
-end
-
 ---@return ClaudinhoWindowConfig
 local function window_config()
-  return plugin_config().window or require("claudinho.config").defaults.window
+  return require("claudinho.config").current().window or require("claudinho.config").defaults.window
 end
 
 ---The layout in use; an invalid value counts as `right` (the config already reported it).
@@ -151,6 +143,37 @@ local function apply_options(win)
   set_wo(win, "signcolumn", "no")
   set_wo(win, "foldcolumn", "0")
   set_wo(win, "winfixbuf", true)
+end
+
+---Neovim copies the local options of a window to a split made from it (`<C-w>f`, `:split file`, the split of a diff).
+---A window that is not the Claude window but carries its tab bar or status line is such a copy: it gets back the global
+---value of every option `apply_options` sets, `winfixbuf` included, which would stop it from showing another buffer.
+local function clear_copied_options()
+  local claude = M.state.win
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if win ~= claude then
+      local function local_value(name)
+        local ok, value = pcall(vim.api.nvim_get_option_value, name, { scope = "local", win = win })
+        return ok and value or nil
+      end
+      if local_value("winbar") == WINBAR or local_value("statusline") == STATUSLINE then
+        for _, name in ipairs({
+          "winbar",
+          "statusline",
+          "number",
+          "relativenumber",
+          "signcolumn",
+          "foldcolumn",
+          "winfixbuf",
+        }) do
+          local ok, value = pcall(vim.api.nvim_get_option_value, name, { scope = "global" })
+          if ok then
+            set_wo(win, name, value)
+          end
+        end
+      end
+    end
+  end
 end
 
 ---Put a buffer in the window. `winfixbuf` is off only for this swap, which is the plugin's own.
@@ -478,6 +501,10 @@ function M.setup()
     callback = function()
       M.resize()
     end,
+  })
+  vim.api.nvim_create_autocmd("WinNew", {
+    group = group,
+    callback = clear_copied_options,
   })
   -- `:q` on the last editor window: the Claude window goes first, so Neovim leaves and the exit rule applies (46).
   vim.api.nvim_create_autocmd("QuitPre", {

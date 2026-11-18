@@ -461,3 +461,98 @@ Run in parallel by four `docs-writer` agents, one per task, on disjoint files.
 - **Needs skipped:** Task 18, the diff resize details and `state.removed_found` (implementation detail, in `ARCHITECTURE.md`); Task 19, internal modules (`session.lua`, the registry, `selection.resend_latest`).
 - **Checks (main session):** `format-check` green (297 files, 0 changed); no em dash in the six docs nor in `docs/features/base-ui`; 38 origin lines; `LICENSE` unchanged.
 - **Out of scope:** upstream paragraphs of `PROTOCOL.md` (248, 481) and `ARCHITECTURE.md` (118-119) still name the removed `:ClaudeCode*` diff commands, kept by the spec's limit; two upstream comments with the em dash (`lua/claudinho/terminal/paste_fix.lua:134`, `lua/claudinho/tools/open_file.lua:604`). Both to the backlog at the end of the run.
+
+### Review (code-reviewer + security-reviewer)
+
+Scope: the whole feature, `git diff main...develop` (22 commits). Both verdicts: fix first. One fix round by `lua`, then a focused re-review of that round (beyond the budget, approved by the user), then a second fix round after a user decision on rule 46.
+
+- **Fixed, first round:**
+  - Security (medium): `session_id` came from an unvalidated POST body and became the argv word after `--resume`; an id like `--dangerously-skip-permissions` would be read as a flag on the next `tab-restart`. Now `sources/session_data.lua` keeps it only when it has a UUID shape, and `session.lua` passes one argv word `--resume=<id>` (`start` accepts a word list). Fixtures in `tests/fixtures/claude/*.json` use UUIDs.
+  - Rule 43: `tab-restart` with no session id now replies `Claude <n>: no session to resume, started a new one`.
+  - Rule 38: `session.close` uses `sessions.reject_waiting`, so a closed tab's waiting diffs get `DIFF_REJECTED` (the raw `coroutine.resume` never sent it).
+  - `ui/window.lua`: WinNew restores the global values of the window options the Claude window sets (winbar, statusline, number, relativenumber, signcolumn, foldcolumn, winfixbuf) on a split made from it.
+  - `init.lua`/`commands.lua`: `send_at_mention` returns `start_failed`; the file loops stop at the first start failure (one error instead of two per file).
+  - Start error texts aligned with the section 4 table (`[Claudinho] Could not start Claude <n>: '<exe>' ...`).
+  - Standards: `config.current()` replaces four copies of the running-config lookup; `sessions.numbers()` replaces the copies in `commands.lua` and `health.lua`.
+  - User decision: `_G.claude_deferred_responses` renamed `_G.claudinho_deferred_responses`, so claudecode.nvim running alongside cannot drop Claudinho's pending diff senders (approved scope: `diff.lua`, `server/init.lua`).
+- **Rule 46, ExitPre:** the Task 15 handler stopped the tabs on every ExitPre, including an exit that Neovim then cancels (E37/E162). The first round replaced it with a BufWritePost watcher for `:wqa`; the re-review found it wrong in four real cases (verified headless on 0.12.3): `do_wqall` checks running jobs per buffer in buffer order, so a Claude terminal numbered below the unwritten file raised E948 after the watcher had armed (Claude killed, Neovim open); a `vim.wait` in BufWritePre (sync format-on-save) ran the `vim.schedule` cleanup before the writes; acwrite buffers with BufWriteCmd never fire BufWritePost; and a pending diff's proposal buffer written by `:wqa` accepted the diff. Neovim gives no "the exit will proceed" signal at ExitPre.
+  - **User decision (2026-11-17):** at ExitPre, when nothing can cancel the exit (no modified buffer other than nofile/nowrite/terminal and pending-diff proposals; acwrite and prompt count; no foreign terminal with a running job), reject the diffs and stop the tab jobs. Otherwise do nothing: `:q`/`:qa` give E37/E162 and `:wqa`/`:xa` write and stop once with E948, tabs and diffs intact; the next `:wqa` or `:qa` exits clean. Forced exits end in VimLeavePre. While an exit is in progress (`diff.exit_in_progress`, set at ExitPre, cleared on a once SafeState, which does not fire during `vim.wait` inside the command), a write of a proposal buffer never accepts the diff.
+  - Facts on 0.12.3: only `:wqa`/`:xa` raise E948 for running jobs; `:qa`, `:confirm qa` exit; `:wqa!` skips E948; a modified prompt buffer cancels `:qa`.
+  - `tests/integration/criteria_exit_spec.lua` now has 14 scenarios (qa, quit_last, qa_bang, wqa_bang, foreign_terminal_qa, cancelled_qa, cancelled_quit_last, cancelled_prompt, wqa, wqa_file_after_tabs, xa, wqa_slow_write, wqa_acwrite, wqa_open_diff); each runs its cancelled steps first and then the clean exit. `wqa_open_diff` fails with the `exit_in_progress` guard disabled.
+- **Not fixed, to the backlog:** security low: the WebSocket token is also the relay token in the claude env (separate relay token); HTTP clients that sent `POST ` have no idle deadline and no cap. Rule 30 for a new or restarted tab (user: register for later). The `:bwipeout!` neighbour with waiting diffs question (added to the existing rule 44 bug). QuitPre closes the Claude window before an E37-cancelled `:q`. An `<Esc>` fed after `:Claudinho send` may reach the TUI (needs a repro).
+- **Manual checks:** interactive `:wqa` with 2 tabs and a modified file (E948 once, file written, tabs and diff intact, second `:wqa` exits with no process or lock left); a pending diff plus a modified file then `:wqa` (diff stays pending, next `:wqa` rejects it); `:qa` with changes then `:w` on a proposal buffer accepts again (the flag cleared); `:split file` and `<C-w>f` from the Claude window give a normal window; `tab-restart` on a tab with no session id shows the rule 43 reply.
+
+### Task 21 - Verificação final e medição (gate done; manual script pending)
+
+- **Final gate (test-runner, working tree on top of `2abdcea` with the review rounds):** the first run failed only on `tests/unit/server/log_lines_spec.lua:175`: with the `[Claudinho] ` prefix from the review round, the port start error was 78 cells, above the 68-cell echospace of an 80-column screen with ruler and showcmd. User decision (2026-11-18): keep the prefix and shorten the reason; `server/tcp.lua` drops the `(EADDRINUSE)` code (the "No free port" text already says it) and keeps any other code, e.g. `(EACCES)`; spec section 4 updated. Also by user decision, the two upstream em dashes in comments (`terminal/paste_fix.lua:134`, `tools/open_file.lua:604`) became "-". Rerun, all green:
+  - `mise run all` (`BUSTED_SEED=12345 CI=true`): `format` 0 changed; `check` 0 / 0 in 217 files; `unit` 1992 / 0 / 0 / 39 (621 s).
+  - `integration` on Neovim 0.12.3 (mise): 41 files, 616 / 0 / 0. On 0.12.0 (on demand): 41 files, 616 / 0 / 0. Plenary at `74b06c6c75e4eeb3108ec01852001636d85a932b` (CI pin).
+  - The known `claude_stub_spec.lua:14` passed in the rerun; in the first run it failed with the stub dir of the same repo under its other path (`/home/phrb/workspaces/claudinho.nvim/tests/bin`) first on PATH (evidence added to its backlog entry).
+  - Criteria specs (wall, isolated): cycles 0.36 s, isolation 0.92 s, exit 1.84 s (14 scenarios), tabs_ws 3.55 s; all under 40 s.
+- **Criteria commands (Verification):** all empty except the expected ones; 38 origin lines; no em dash in the docs, `lua` or `docs/features/base-ui`.
+- **Before / after** (before: Task 1 baseline on `8933efd`; after: this gate; same seed and Neovim 0.12.3):
+
+  | Measure                                        | Before            | After             | Why                                                                                                                                                                                                                                                                                                                                                                     |
+  | ---------------------------------------------- | ----------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `unit` successes / failures / errors / pending | 1639 / 0 / 0 / 28 | 1992 / 0 / 0 / 39 | New specs of Tasks 2-16, 23 and the review rounds (sessions, session, session_settings, session_data, status, tabbar, window geometry, commands, keymaps, mention_queue, notify, http, provenance) minus the "Testes que saem" of Tasks 12 and 13 (providers, `:ClaudeCode*` commands, `cwd_spec`); pending grows with the new integration files (pending under busted) |
+  | `integration` files / passed                   | 30 / 508          | 41 / 616          | New integration specs (session, sessions, window, relay, diff routing, the four criteria specs, exit-key) minus the removed provider specs                                                                                                                                                                                                                              |
+  | `check` files                                  | 183               | 217               | New modules and specs                                                                                                                                                                                                                                                                                                                                                   |
+  | Coverage total                                 | 86.22%            | 90.14%            | The new modules are well covered; the removed provider and cwd modules leave                                                                                                                                                                                                                                                                                            |
+  | Relay, average per call                        | 11.4 ms (Task 4)  | 13.0 ms           | Same order as F4 (9.7 to 12.1 ms), measured on a busy machine; far under the 2000 ms limit                                                                                                                                                                                                                                                                              |
+
+  Coverage per file (%):
+
+  | File                              | Before |  After | Note                                                                  |
+  | --------------------------------- | -----: | -----: | --------------------------------------------------------------------- |
+  | `commands.lua`                    |      - |  81.37 | new                                                                   |
+  | `config.lua`                      |  96.55 |  99.66 |                                                                       |
+  | `conflict.lua`                    |  93.75 |  94.12 |                                                                       |
+  | `cwd.lua`                         |  80.39 |      - | removed (Tasks 12, 13)                                                |
+  | `diff.lua`                        |  92.79 |  98.90 |                                                                       |
+  | `diff_inline.lua`                 |  86.02 |  87.16 |                                                                       |
+  | `health.lua`                      |  94.94 |  98.92 |                                                                       |
+  | `init.lua`                        |  73.05 |  91.10 |                                                                       |
+  | `integrations.lua`                |  63.01 |  65.18 |                                                                       |
+  | `lockfile.lua`                    |  81.25 |  83.11 |                                                                       |
+  | `logger.lua`                      |  88.17 |  89.47 |                                                                       |
+  | `mention_queue.lua`               |      - |  98.10 | new                                                                   |
+  | `notify.lua`                      |      - | 100.00 | new                                                                   |
+  | `selection.lua`                   |  90.42 |  93.00 |                                                                       |
+  | `server/client.lua`               |  96.30 |  97.28 |                                                                       |
+  | `server/frame.lua`                |  95.38 |  96.95 |                                                                       |
+  | `server/handshake.lua`            |  81.32 |  85.11 |                                                                       |
+  | `server/http.lua`                 |      - |  95.83 | new                                                                   |
+  | `server/init.lua`                 |  88.24 |  93.55 |                                                                       |
+  | `server/mock.lua`                 |  62.39 |  66.94 |                                                                       |
+  | `server/tcp.lua`                  |  93.48 |  94.70 |                                                                       |
+  | `server/utils.lua`                |  85.17 |  86.60 |                                                                       |
+  | `session.lua`                     |      - |  98.87 | new                                                                   |
+  | `session_settings.lua`            |      - |  89.13 | new                                                                   |
+  | `sessions.lua`                    |      - |  98.26 | new                                                                   |
+  | `sources/relay.lua`               |      - |  59.68 | new; runs in a child `nvim -l` (relay_spec), not counted by luacov    |
+  | `sources/session_data.lua`        |      - |  95.24 | new                                                                   |
+  | `terminal.lua`                    |  78.51 | 100.00 |                                                                       |
+  | `terminal/external.lua`           |  88.30 |      - | removed (Tasks 12, 13)                                                |
+  | `terminal/native.lua`             |  91.57 |      - | removed (Tasks 12, 13)                                                |
+  | `terminal/none.lua`               |  86.67 |      - | removed (Tasks 12, 13)                                                |
+  | `terminal/owned.lua`              | 100.00 |      - | removed (Tasks 12, 13)                                                |
+  | `terminal/paste_fix.lua`          |  98.68 |  97.37 |                                                                       |
+  | `tools/check_document_dirty.lua`  | 100.00 | 100.00 |                                                                       |
+  | `tools/close_all_diff_tabs.lua`   | 100.00 | 100.00 |                                                                       |
+  | `tools/close_tab.lua`             |  95.83 |  96.15 |                                                                       |
+  | `tools/get_current_selection.lua` |  98.00 |  98.18 |                                                                       |
+  | `tools/get_diagnostics.lua`       |  97.30 |  97.56 |                                                                       |
+  | `tools/get_latest_selection.lua`  | 100.00 | 100.00 |                                                                       |
+  | `tools/get_open_editors.lua`      |  93.55 |  95.52 |                                                                       |
+  | `tools/get_workspace_folders.lua` | 100.00 | 100.00 |                                                                       |
+  | `tools/init.lua`                  |  90.20 |  90.48 |                                                                       |
+  | `tools/open_diff.lua`             | 100.00 | 100.00 |                                                                       |
+  | `tools/open_file.lua`             |  96.25 |  97.30 |                                                                       |
+  | `tools/save_document.lua`         | 100.00 | 100.00 |                                                                       |
+  | `ui/status.lua`                   |      - | 100.00 | new                                                                   |
+  | `ui/tabbar.lua`                   |      - |  98.73 | new                                                                   |
+  | `ui/window.lua`                   |      - |  43.30 | new; mostly covered by integration specs, which luacov does not count |
+  | `utils.lua`                       |  96.45 |  95.74 |                                                                       |
+  | `visual_commands.lua`             |  54.69 |  55.82 |                                                                       |
+
+- **Manual script (user):** pending; the result of each of the 19 steps of the Verification section, plus the manual checks of Tasks 15, 23 and the review rounds, goes here.

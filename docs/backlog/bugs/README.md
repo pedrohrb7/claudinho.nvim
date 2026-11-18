@@ -18,3 +18,8 @@ Confirmed bugs that need fixing, one file per bug.
 | [Teste session_spec depende do ambiente de quem o executa (CLAUDINHO_PORT herdado)](2026-11-17-session-spec-depends-on-caller-env.md) | medium   | Open   |
 | [E937 em BufWipeout ao sair do Claude com Ctrl+C duas vezes](2026-11-17-bufwipeout-e937-on-claude-exit.md)                            | high     | Fixed  |
 | [`:bwipeout!` da aba ativa com aba vizinha deixa a janela do Claude fechada](2026-11-17-bwipeout-active-tab-closes-claude-window.md)  | medium   | Open   |
+| [Token do WebSocket é o mesmo token das rotas POST de relay (CLAUDINHO_TOKEN)](2026-11-18-ws-token-reused-as-relay-token.md)          | low      | Open   |
+| [Conexão HTTP sem autenticação, sem prazo ocioso e sem limite esgota descritores](2026-11-18-http-clients-no-idle-deadline-or-cap.md) | low      | Open   |
+| [Esc após `:Claudinho send` pode chegar à TUI do Claude (não verificado)](2026-11-18-send-esc-reaches-claude-tui.md)                  | low      | Open   |
+| [Regra 30: seleção mais recente não é reenviada a aba nova ou reiniciada](2026-11-18-rule30-selection-not-resent-to-new-tab.md)       | medium   | Open   |
+| [QuitPre fecha a janela do Claude antes da checagem de alterações (E37)](2026-11-18-quitpre-closes-claude-window-before-e37.md)       | low      | Open   |

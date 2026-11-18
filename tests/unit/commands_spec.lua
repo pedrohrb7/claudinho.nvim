@@ -106,6 +106,14 @@ describe("commands", function()
       active = function()
         return state.active and state.tabs[state.active] or nil
       end,
+      numbers = function()
+        local list = {}
+        for n in pairs(state.tabs) do
+          list[#list + 1] = n
+        end
+        table.sort(list)
+        return list
+      end,
       new = function(extra)
         table.insert(log, "sessions.new" .. (extra or ""))
       end,
@@ -182,7 +190,8 @@ describe("commands", function()
       end,
     }
     package.loaded["claudinho.visual_commands"] = {
-      create_visual_command_wrapper = function()
+      create_visual_command_wrapper = function(normal, visual)
+        state.tree_handlers = { normal = normal, visual = visual }
         return function(opts)
           state.wrapped_opts = opts
           table.insert(log, "visual_commands.wrapper")
@@ -565,6 +574,42 @@ describe("commands", function()
       run("tree-add")
 
       assert.are.same({ "visual_commands.wrapper" }, log)
+    end)
+  end)
+
+  describe("tree-add when the first tab cannot start", function()
+    local files = { "/a.lua", "/b.lua", "/c.lua", "/d.lua", "/e.lua" }
+
+    before_each(function()
+      package.loaded["claudinho"].send_at_mention = function(file_path)
+        table.insert(log, "send_at_mention " .. file_path)
+        -- `sessions.new` showed why; the third value tells the loop to stop.
+        return false, "[Claudinho] Could not start Claude 1: 'claude' is not executable", true
+      end
+      package.loaded["claudinho.integrations"] = {
+        get_selected_files_from_tree = function()
+          return files, nil
+        end,
+      }
+      package.loaded["claudinho.visual_commands"].get_files_from_visual_selection = function()
+        return files, nil
+      end
+    end)
+
+    it("tries the first file only and logs nothing more", function()
+      run("tree-add")
+      state.tree_handlers.normal()
+
+      assert.same({ "visual_commands.wrapper", "send_at_mention /a.lua" }, log)
+      assert.same({}, notices("logged"))
+    end)
+
+    it("does the same for a visual selection", function()
+      run("tree-add")
+      state.tree_handlers.visual({})
+
+      assert.same({ "visual_commands.wrapper", "send_at_mention /a.lua" }, log)
+      assert.same({}, notices("logged"))
     end)
   end)
 

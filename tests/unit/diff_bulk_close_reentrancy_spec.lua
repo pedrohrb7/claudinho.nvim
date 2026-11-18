@@ -151,7 +151,7 @@ describe("bulk close with a ClaudinhoDiffClosed handler that resolves another di
     it(name .. " also closes the diff the handler rejected, and answers each call once", function()
       local answers = 0
       -- Every lookup finds a sender, so a second answer to either call would be counted too.
-      _G.claude_deferred_responses = setmetatable({}, {
+      _G.claudinho_deferred_responses = setmetatable({}, {
         __index = function()
           return function()
             answers = answers + 1
@@ -159,7 +159,7 @@ describe("bulk close with a ClaudinhoDiffClosed handler that resolves another di
         end,
       })
       finally(function()
-        _G.claude_deferred_responses = nil
+        _G.claudinho_deferred_responses = nil
       end)
       local handles = {
         ["tab-A"] = open_pending(file_a, "tab-A", "clientA"),

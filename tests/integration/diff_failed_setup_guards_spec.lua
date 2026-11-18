@@ -98,7 +98,7 @@ describe("openDiff when the setup fails in a new tab", function()
     vim.fn.writefile({ "alpha", "beta" }, path)
     vim.api.nvim_create_augroup(group, { clear = true })
     tools.register_all()
-    _G.claude_deferred_responses = {}
+    _G.claudinho_deferred_responses = {}
   end)
 
   local function reset()
@@ -112,7 +112,7 @@ describe("openDiff when the setup fails in a new tab", function()
   after_each(function()
     reset()
     vim.fn.delete(dir, "rf")
-    _G.claude_deferred_responses = nil
+    _G.claudinho_deferred_responses = nil
     if jit then
       jit.opt.start("hotloop=56", "hotexit=10", "tryside=4") -- LuaJIT's defaults
     end

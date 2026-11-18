@@ -1,5 +1,5 @@
 {
-  "session_id": "s1",
+  "session_id": "123e4567-e89b-12d3-a456-426614174000",
   "model": { "id": "claude-opus-5-5", "display_name": "Opus 5.5" },
   "effort": { "level": "high" }
 }

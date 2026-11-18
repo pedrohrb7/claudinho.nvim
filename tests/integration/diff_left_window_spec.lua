@@ -21,7 +21,7 @@ describe("diff mode in a window that left a split diff", function()
       arguments = { old_file_path = path, new_file_path = path, new_file_contents = "one\nTWO\n", tab_name = tab },
     })
     assert.is_true(call._deferred, "openDiff waits for the user")
-    _G.claude_deferred_responses[tostring(call.coroutine)] = function(response)
+    _G.claudinho_deferred_responses[tostring(call.coroutine)] = function(response)
       answers[#answers + 1] = response
     end
     return diff._get_active_diffs()[tab]
@@ -76,7 +76,7 @@ describe("diff mode in a window that left a split diff", function()
     vim.fn.writefile({ "third" }, dir .. "/third.txt")
     vim.fn.writefile({ "fourth" }, dir .. "/fourth.txt")
     tools.register_all()
-    _G.claude_deferred_responses = {}
+    _G.claudinho_deferred_responses = {}
     answers = {}
     vim.cmd("edit " .. vim.fn.fnameescape(file))
   end)
@@ -87,7 +87,7 @@ describe("diff mode in a window that left a split diff", function()
     vim.cmd("silent! only!")
     vim.cmd("silent! %bwipeout!")
     vim.fn.delete(dir, "rf")
-    _G.claude_deferred_responses = nil
+    _G.claudinho_deferred_responses = nil
   end)
 
   describe("a file that comes back after the cleanup, which the cleanup does not look at (as on main)", function()

@@ -24,8 +24,8 @@ describe("Server instances", function()
       package.loaded[name] = nil
     end
     closed = {}
-    saved = { diff = package.loaded["claudinho.diff"], deferred = _G.claude_deferred_responses }
-    _G.claude_deferred_responses = nil
+    saved = { diff = package.loaded["claudinho.diff"], deferred = _G.claudinho_deferred_responses }
+    _G.claudinho_deferred_responses = nil
     package.loaded["claudinho.diff"] = {
       close_diffs_for_client = function(client_id, reason)
         table.insert(closed, { client_id, reason })
@@ -40,7 +40,7 @@ describe("Server instances", function()
 
   after_each(function()
     package.loaded["claudinho.diff"] = saved.diff
-    _G.claude_deferred_responses = saved.deferred
+    _G.claudinho_deferred_responses = saved.deferred
   end)
 
   ---Accept a connection on the instance and finish its handshake.
@@ -149,15 +149,15 @@ describe("Server instances", function()
       local client_b = connect(b, "token-b-0123456789")
       local key_a = defer(a, client_a, 1)
       local key_b = defer(b, client_b, 2)
-      assert.is_function(_G.claude_deferred_responses[key_a])
-      assert.is_function(_G.claude_deferred_responses[key_b])
+      assert.is_function(_G.claudinho_deferred_responses[key_a])
+      assert.is_function(_G.claudinho_deferred_responses[key_b])
 
       a:stop()
 
-      assert.is_nil(_G.claude_deferred_responses[key_a])
-      assert.is_function(_G.claude_deferred_responses[key_b])
+      assert.is_nil(_G.claudinho_deferred_responses[key_a])
+      assert.is_function(_G.claudinho_deferred_responses[key_b])
       b:stop()
-      assert.is_nil(_G.claude_deferred_responses[key_b])
+      assert.is_nil(_G.claudinho_deferred_responses[key_b])
     end)
 
     it("rejects only the diffs of its own clients", function()
@@ -200,7 +200,7 @@ describe("Server instances", function()
     local co = coroutine.create(function() end)
     local key = tostring(co)
     a:_setup_deferred_response({ client = client_a, id = 7, coroutine = co })
-    _G.claude_deferred_responses[key]({ content = { { type = "text", text = "FILE_SAVED" } } })
+    _G.claudinho_deferred_responses[key]({ content = { { type = "text", text = "FILE_SAVED" } } })
 
     assert.equals(1, #written_a)
     assert.equals(0, #written_b)

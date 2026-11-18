@@ -170,4 +170,15 @@ describe("Claudinho send visual selection in tree buffers", function()
     local call_count = #claudinho.send_at_mention.calls
     assert.is_true(call_count == 3, "Expected 3 sends, got " .. tostring(call_count))
   end)
+
+  it("stops at the first file when the first tab cannot start", function()
+    claudinho.send_at_mention = spy.new(function()
+      -- `sessions.new` showed why; the third value tells the loop to stop.
+      return false, "[Claudinho] Could not start Claude 1: 'claude' is not executable", true
+    end)
+
+    command_callback({})
+
+    assert.equals(1, #claudinho.send_at_mention.calls)
+  end)
 end)

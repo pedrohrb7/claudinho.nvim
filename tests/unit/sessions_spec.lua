@@ -95,6 +95,41 @@ describe("sessions", function()
     stub(vim.fn, "getcwd", function()
       return state.cwd
     end)
+    -- The buffers `ExitPre` looks at: `state.bufs[buf] = { buftype, modified, job }`.
+    state.bufs = {}
+    stub(vim.api, "nvim_list_bufs", function()
+      local list = {}
+      for buf in pairs(state.bufs) do
+        list[#list + 1] = buf
+      end
+      table.sort(list)
+      return list
+    end)
+    stub(vim.api, "nvim_buf_is_loaded", function()
+      return true
+    end)
+    stub(
+      vim,
+      "bo",
+      setmetatable({}, {
+        __index = function(_, buf)
+          return state.bufs[buf] or {}
+        end,
+      })
+    )
+    stub(
+      vim,
+      "b",
+      setmetatable({}, {
+        __index = function(_, buf)
+          local entry = state.bufs[buf]
+          return { terminal_job_id = entry and entry.job }
+        end,
+      })
+    )
+    stub(vim.fn, "jobwait", function(jobs)
+      return { state.running_jobs and state.running_jobs[jobs[1]] and -1 or 0 }
+    end)
     stub(vim.api, "nvim_create_augroup", function(name, opts)
       table.insert(state.augroups, { name = name, opts = opts })
       return name
@@ -240,13 +275,13 @@ describe("sessions", function()
     end)
 
     it("shows the error and leaves no tab when the session does not start", function()
-      state.start_error = "Could not start Claude 1: `claude` is not executable"
+      state.start_error = "[Claudinho] Could not start Claude 1: 'claude' is not executable"
 
       local s, err = sessions.new()
 
       assert.is_nil(s)
-      assert.equals("Could not start Claude 1: `claude` is not executable", err)
-      assert.same({ { "error", "Could not start Claude 1: `claude` is not executable" } }, state.notices)
+      assert.equals("[Claudinho] Could not start Claude 1: 'claude' is not executable", err)
+      assert.same({ { "error", "[Claudinho] Could not start Claude 1: 'claude' is not executable" } }, state.notices)
       assert.is_nil(sessions.active())
       assert.same({}, sessions.state.tabs)
       assert.equals(0, #state.window_show)
@@ -488,6 +523,26 @@ describe("sessions", function()
       assert.is_nil(sessions.state.by_server[old_id])
       assert.equals(1, sessions.state.by_server[s.server.id])
       assert.is_true(state.window_refresh > before)
+    end)
+
+    it("replies that no session could be resumed when the tab has no session id (rule 43)", function()
+      local s = assert(sessions.new())
+      s.state = "exited"
+      s.data.session_id = nil
+
+      assert.is_true(sessions.restart(1))
+
+      assert.same({ { "reply", "Claude 1: no session to resume, started a new one" } }, state.notices)
+    end)
+
+    it("does not reply when the tab resumes a session", function()
+      local s = assert(sessions.new())
+      s.state = "exited"
+      s.data.session_id = "123e4567-e89b-12d3-a456-426614174000"
+
+      assert.is_true(sessions.restart(1))
+
+      assert.same({}, state.notices)
     end)
 
     it("shows the error of a restart that fails on an exited tab", function()
@@ -776,6 +831,119 @@ describe("sessions", function()
       assert.same({ 11, 12 }, stopped)
       assert.equals(first, sessions.state.tabs[1])
       assert.equals(second, sessions.state.tabs[2])
+    end)
+
+    describe("a cancelled exit", function()
+      local function two_tabs_with_diff()
+        local first = assert(sessions.new())
+        local second = assert(sessions.new())
+        first.job, second.job = 11, 12
+        state.bufs[first.buf] = { buftype = "terminal", job = 11 }
+        state.bufs[second.buf] = { buftype = "terminal", job = 12 }
+        state.running_jobs = { [11] = true, [12] = true }
+        local d, answers = waiting_diff("a")
+        first.pending_diffs = { d }
+        local stopped = {}
+        stub(vim.fn, "jobstop", function(job)
+          table.insert(stopped, job)
+          return 1
+        end)
+        sessions.setup_autocmds()
+        return first, answers, stopped
+      end
+
+      it("leaves the processes running and the diffs pending when the changes are never written (:qa)", function()
+        local first, answers, stopped = two_tabs_with_diff()
+        state.bufs[7] = { buftype = "", modified = true }
+
+        callback_of("ExitPre")()
+
+        assert.same({}, stopped)
+        assert.same({}, answers)
+        assert.same({}, state.diff_closed)
+        assert.equals(1, #first.pending_diffs)
+        assert.equals(0, first.server.drained)
+      end)
+
+      it("does nothing at ExitPre when the changes are to be written (:wqa writes them and stops once)", function()
+        local first, answers, stopped = two_tabs_with_diff()
+        state.bufs[7] = { buftype = "", modified = true }
+        state.bufs[8] = { buftype = "acwrite", modified = true }
+        state.bufs[9] = { buftype = "prompt", modified = true }
+
+        callback_of("ExitPre")()
+
+        assert.same({}, stopped)
+        assert.same({}, answers)
+        assert.equals(1, #first.pending_diffs)
+        assert.is_nil(callback_of("BufWritePost"))
+      end)
+
+      it("counts a buffer with changes of acwrite or prompt type, one by one", function()
+        for _, buftype in ipairs({ "acwrite", "prompt" }) do
+          local _, _, stopped = two_tabs_with_diff()
+          state.bufs[7] = { buftype = buftype, modified = true }
+
+          callback_of("ExitPre")()
+
+          assert.same({}, stopped, buftype)
+          sessions.kill_all()
+          sessions.state.tabs = {}
+          state.bufs = {}
+        end
+      end)
+
+      it("flags the exit for the diff module until Neovim is idle again (SafeState)", function()
+        two_tabs_with_diff()
+        state.bufs[7] = { buftype = "", modified = true }
+        local diff = package.loaded["claudinho.diff"]
+
+        callback_of("ExitPre")()
+
+        assert.is_true(diff.exit_in_progress)
+        local _, opts = callback_of("SafeState")
+        assert.is_true(opts.once)
+        callback_of("SafeState")()
+        assert.is_false(diff.exit_in_progress)
+      end)
+
+      it("leaves them too when a terminal job that is not ours still runs", function()
+        local first, answers, stopped = two_tabs_with_diff()
+        state.bufs[8] = { buftype = "terminal", job = 99 }
+        state.running_jobs[99] = true
+
+        callback_of("ExitPre")()
+
+        assert.same({}, stopped)
+        assert.same({}, answers)
+        assert.equals(1, #first.pending_diffs)
+      end)
+
+      it("goes on when the buffer with changes is no file: nofile, nowrite, or a pending proposal", function()
+        local _, answers, stopped = two_tabs_with_diff()
+        state.bufs[7] = { buftype = "nofile", modified = true }
+        state.bufs[8] = { buftype = "nowrite", modified = true }
+        state.bufs[10] = { buftype = "acwrite", modified = true }
+        state.bufs[11] = { buftype = "terminal", job = 77 }
+        package.loaded["claudinho.diff"]._get_active_diffs = function()
+          return { proposal = { status = "pending", new_buffer = 10 } }
+        end
+
+        callback_of("ExitPre")()
+
+        assert.same({ "reject" }, answers)
+        assert.same({ 11, 12 }, stopped)
+      end)
+
+      it("goes on when no buffer holds changes any more (the second :wqa)", function()
+        local _, answers, stopped = two_tabs_with_diff()
+        state.bufs[7] = { buftype = "", modified = false }
+
+        callback_of("ExitPre")()
+
+        assert.same({ "reject" }, answers)
+        assert.same({ 11, 12 }, stopped)
+      end)
     end)
 
     it("VimLeavePre does the rest of kill_all", function()

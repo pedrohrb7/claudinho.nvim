@@ -102,7 +102,7 @@ describe("MCP-compliant diff operations", function()
       local non_existent_file = dir .. "/non_existent_file.txt"
 
       -- Set up mock resolution
-      _G.claude_deferred_responses = {
+      _G.claudinho_deferred_responses = {
         [tostring(coroutine.running())] = function()
           -- Mock resolution
         end,
@@ -270,7 +270,7 @@ describe("MCP-compliant diff operations", function()
         },
       })
       assert.is_true(deferred._deferred, "the tool should wait for the user")
-      _G.claude_deferred_responses = {
+      _G.claudinho_deferred_responses = {
         [tostring(deferred.coroutine)] = function(response)
           sent = response
         end,
@@ -293,7 +293,7 @@ describe("MCP-compliant diff operations", function()
     end)
 
     after_each(function()
-      _G.claude_deferred_responses = nil
+      _G.claudinho_deferred_responses = nil
     end)
 
     it("sends openDiff's result once the user rejects the diff", function()

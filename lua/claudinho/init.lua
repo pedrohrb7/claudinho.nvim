@@ -103,6 +103,7 @@ end
 ---@param context string|nil Context for logging
 ---@return boolean success Whether the operation was successful
 ---@return string|nil error Error message if failed
+---@return boolean|nil start_failed True when the first tab could not start; `sessions.new` has shown why already, and a loop over files must stop
 function M.send_at_mention(file_path, start_line, end_line, context)
   context = context or "command"
   local sessions = require("claudinho.sessions")
@@ -113,7 +114,7 @@ function M.send_at_mention(file_path, start_line, end_line, context)
     local new_error
     s, new_error = sessions.new()
     if not s then
-      return false, new_error
+      return false, new_error, true
     end
     local mention, format_error = s.queue:enqueue(file_path, start_line, end_line)
     if not mention then

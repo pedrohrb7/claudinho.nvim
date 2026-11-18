@@ -241,7 +241,7 @@ describe("openDiff tool MCP compliance", function()
       }
 
       -- Set up mock resolution to avoid hanging
-      _G.claude_deferred_responses = {
+      _G.claudinho_deferred_responses = {
         [tostring(coroutine.running())] = function(result)
           -- Mock resolution
         end,

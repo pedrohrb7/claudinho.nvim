@@ -16,3 +16,4 @@ Planned refactors that aren't urgent bugs but are worth doing deliberately, one 
 | [Em dash in pre-existing Lua comments](2026-11-17-em-dash-in-lua-comments.md)                                                                  | Proposed |
 | [Leftovers of removed options in test setup and comments](2026-11-17-stale-removed-option-leftovers-in-tests.md)                               | Proposed |
 | [Unit mocks of config.without_removed_options out of sync with the real signature](2026-11-17-unit-mocks-without-removed-options-signature.md) | Proposed |
+| [PROTOCOL.md e ARCHITECTURE.md ainda citam comandos de diff removidos](2026-11-18-protocol-architecture-removed-diff-commands.md)              | Proposed |

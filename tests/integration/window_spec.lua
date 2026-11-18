@@ -561,6 +561,37 @@ describe("window", function()
     end)
   end)
 
+  describe("windows made from the Claude window", function()
+    for _, command in ipairs({ "split", "vsplit" }) do
+      it((":%s does not copy the tab bar and the status line"):format(command), function()
+        assert(sessions.new())
+        local claude = assert(window.win())
+        vim.api.nvim_set_current_win(claude)
+        vim.cmd("stopinsert")
+
+        vim.cmd(command)
+        local made = vim.api.nvim_get_current_win()
+
+        assert.are_not.equal(claude, made)
+        for _, name in ipairs({ "winbar", "statusline" }) do
+          assert.equals(
+            vim.api.nvim_get_option_value(name, { scope = "global" }),
+            vim.api.nvim_get_option_value(name, { scope = "local", win = made })
+          )
+        end
+        -- The other options of the Claude window are not copied either: the split can show any buffer again.
+        assert.is_false(vim.wo[made].winfixbuf)
+        assert.equals(vim.go.signcolumn, vim.wo[made].signcolumn)
+        assert.equals(vim.go.number, vim.wo[made].number)
+        assert.equals(vim.go.foldcolumn, vim.wo[made].foldcolumn)
+        -- The Claude window keeps both.
+        assert.is_true(drawn(claude, "winbar"):find("1 Claude 1", 1, true) ~= nil)
+        assert.equals("", drawn(claude, "statusline"))
+        assert.is_true(vim.api.nvim_get_option_value("statusline", { scope = "local", win = claude }) ~= "")
+      end)
+    end
+  end)
+
   describe("float and diff", function()
     it("a diff hides the float, ensure_visible does not bring it back, and open does", function()
       layout = "float"

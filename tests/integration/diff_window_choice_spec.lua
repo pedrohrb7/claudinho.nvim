@@ -47,7 +47,7 @@ describe("unified diff window choice", function()
       arguments = { old_file_path = path, new_file_path = path, new_file_contents = "one\nTWO\n", tab_name = tab },
     })
     assert.is_true(call._deferred, "openDiff waits for the user")
-    _G.claude_deferred_responses[tostring(call.coroutine)] = function() end
+    _G.claudinho_deferred_responses[tostring(call.coroutine)] = function() end
     return diff._get_active_diffs()[tab].new_window
   end
 
@@ -62,7 +62,7 @@ describe("unified diff window choice", function()
     path = dir .. "/b.txt"
     vim.fn.writefile({ "one", "two" }, path)
     tools.register_all()
-    _G.claude_deferred_responses = {}
+    _G.claudinho_deferred_responses = {}
     -- The Claude terminal is a real tab, with its own private lock folder and a command that only waits.
     tab_env_dir = tab_env.new()
     saved_lock_dir = lockfile.lock_dir
@@ -88,7 +88,7 @@ describe("unified diff window choice", function()
     vim.cmd("setlocal nopreviewwindow")
     vim.cmd("silent! %bwipeout!")
     vim.fn.delete(dir, "rf")
-    _G.claude_deferred_responses = nil
+    _G.claudinho_deferred_responses = nil
   end)
 
   it("closes its new tab after close_tab when the tab has no Claude terminal", function()

@@ -1,1 +1,4 @@
-{ "session_id": "s5", "model": { "id": "us.anthropic.claude-opus-5-5-v1:0" } }
+{
+  "session_id": "123e4567-e89b-12d3-a456-426614174005",
+  "model": { "id": "us.anthropic.claude-opus-5-5-v1:0" }
+}

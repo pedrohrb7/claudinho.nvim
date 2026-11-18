@@ -120,7 +120,7 @@ describe("sessions", function()
     local result = http_post.post(
       second.lock_port,
       "/claudinho/statusline",
-      '{"session_id":"sid-2","model":{"id":"claude-opus-5-5","display_name":"Opus"}}',
+      '{"session_id":"123e4567-e89b-12d3-a456-426614174002","model":{"id":"claude-opus-5-5","display_name":"Opus"}}',
       { ["X-Claudinho-Token"] = second.token, ["Content-Type"] = "application/json" }
     )
     assert.equals(204, result.status)
@@ -129,7 +129,7 @@ describe("sessions", function()
     end, 10))
 
     assert.equals("Opus 5.5", second.data.model)
-    assert.equals("sid-2", second.data.session_id)
+    assert.equals("123e4567-e89b-12d3-a456-426614174002", second.data.session_id)
     assert.same({}, first.data)
   end)
 

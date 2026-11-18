@@ -2,6 +2,8 @@ require("tests.busted_setup")
 
 local FIXTURES = "tests/fixtures/claude/"
 
+local SESSION_ID = "123e4567-e89b-12d3-a456-426614174000"
+
 local function fixture(name)
   local file = assert(io.open(FIXTURES .. name .. ".json", "r"))
   local body = file:read("*a")
@@ -37,7 +39,7 @@ describe("sources.session_data", function()
 
   describe("decode()", function()
     it("decodes an object", function()
-      assert.equals("s1", session_data.decode(fixture("hook_stop")).session_id)
+      assert.equals(SESSION_ID, session_data.decode(fixture("hook_stop")).session_id)
     end)
 
     it("returns nil, without an error, for invalid JSON", function()
@@ -111,7 +113,7 @@ describe("sources.session_data", function()
   describe("from_statusline()", function()
     it("reads session id, model and effort", function()
       assert.same(
-        { session_id = "s1", model = "Opus 5.5", effort = "high" },
+        { session_id = SESSION_ID, model = "Opus 5.5", effort = "high" },
         statusline("statusline_opus_display_version")
       )
     end)
@@ -127,6 +129,28 @@ describe("sources.session_data", function()
     it("accepts nil", function()
       assert.same({}, session_data.from_statusline(nil))
     end)
+
+    it("drops a session id that is no UUID, as it reaches the command line of --resume", function()
+      for _, hostile in ipairs({
+        "--dangerously-skip-permissions",
+        "--settings=/tmp/x.json",
+        "123e4567-e89b-12d3-a456-42661417400",
+        "123e4567-e89b-12d3-a456-4266141740000",
+        "123e4567-e89b-12d3-a456-42661417400g",
+        "123e4567-e89b-12d3-a456-426614174000 --x",
+        "123e4567-e89b-12d3-a456-426614174000\n--x",
+        "s1",
+        "",
+      }) do
+        assert.is_nil(session_data.from_statusline({ session_id = hostile }).session_id, hostile)
+        assert.is_nil(session_data.from_hook({ session_id = hostile }).session_id, hostile)
+      end
+    end)
+
+    it("keeps a UUID in either case", function()
+      local upper = "123E4567-E89B-12D3-A456-426614174000"
+      assert.equals(upper, session_data.from_hook({ session_id = upper }).session_id)
+    end)
   end)
 
   describe("from_hook()", function()
@@ -135,7 +159,7 @@ describe("sources.session_data", function()
     end
 
     it("reads the mode of a SessionStart", function()
-      assert.same({ session_id = "s1", mode = "plan" }, hook("hook_session_start_clear"))
+      assert.same({ session_id = SESSION_ID, mode = "plan" }, hook("hook_session_start_clear"))
     end)
 
     it("reads the mode of a UserPromptSubmit", function()
@@ -143,11 +167,11 @@ describe("sources.session_data", function()
     end)
 
     it("has no mode when the event does not carry one", function()
-      assert.same({ session_id = "s1" }, hook("hook_stop"))
+      assert.same({ session_id = SESSION_ID }, hook("hook_stop"))
     end)
 
     it("reads an unknown event without error", function()
-      assert.same({ session_id = "s1", mode = "auto" }, hook("hook_unknown_event"))
+      assert.same({ session_id = SESSION_ID, mode = "auto" }, hook("hook_unknown_event"))
     end)
 
     it("ignores a mode of the wrong type", function()

@@ -309,10 +309,12 @@ describe("claudinho.init", function()
     it("returns the error of a tab that could not start", function()
       state.new_error = "Could not start Claude 1: nope"
 
-      local ok, err = claudinho.send_at_mention("/work/a.lua")
+      local ok, err, start_failed = claudinho.send_at_mention("/work/a.lua")
 
       assert.is_false(ok)
       assert.are.equal("Could not start Claude 1: nope", err)
+      -- A loop over files stops here: `sessions.new` showed the error already.
+      assert.is_true(start_failed)
     end)
 
     it("returns the format error of a path the queue cannot take", function()

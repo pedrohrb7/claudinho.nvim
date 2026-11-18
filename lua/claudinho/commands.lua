@@ -84,17 +84,6 @@ local function usage_error(usage)
   notify.error("[Claudinho] Usage: :Claudinho " .. usage)
 end
 
----The tab numbers, in order.
----@return integer[]
-local function tab_numbers()
-  local list = {}
-  for n in pairs(sessions().state.tabs) do
-    list[#list + 1] = n
-  end
-  table.sort(list)
-  return list
-end
-
 ---@param arg string|nil
 ---@return integer|nil n The integer the argument writes, or nil
 local function to_number(arg)
@@ -108,7 +97,7 @@ end
 ---A number that names no tab: the error lists the tabs there are.
 ---@param arg string
 local function unknown_tab(arg)
-  notify.error(("[Claudinho] No Claude tab %s. Open tabs: %s"):format(arg, table.concat(tab_numbers(), ", ")))
+  notify.error(("[Claudinho] No Claude tab %s. Open tabs: %s"):format(arg, table.concat(sessions().numbers(), ", ")))
 end
 
 ---The tab a numbered subcommand acts on. Replies or errors, and returns nil, when there is none.
@@ -179,9 +168,12 @@ local function add_paths_to_claude(file_paths, options)
       end
 
       local file_path = file_paths[index]
-      local success, error_msg = send_at_mention(file_path)
+      local success, error_msg, start_failed = send_at_mention(file_path)
       if success then
         success_count = success_count + 1
+      elseif start_failed then
+        -- Claude did not start and `sessions.new` showed why: the other files would fail the same way.
+        return
       else
         logger.error(context, "Failed to add file: " .. file_path .. " - " .. (error_msg or "unknown error"))
       end
@@ -198,9 +190,11 @@ local function add_paths_to_claude(file_paths, options)
     send_files_sequentially(1)
   else
     for _, file_path in ipairs(file_paths) do
-      local success, error_msg = send_at_mention(file_path)
+      local success, error_msg, start_failed = send_at_mention(file_path)
       if success then
         success_count = success_count + 1
+      elseif start_failed then
+        return success_count, total_count
       else
         logger.error(context, "Failed to add file: " .. file_path .. " - " .. (error_msg or "unknown error"))
       end
@@ -378,9 +372,12 @@ local function handle_tree_add_normal()
   local total_count = #files
 
   for _, file_path in ipairs(files) do
-    local success, error_msg = require("claudinho").send_at_mention(file_path, nil, nil, "Claudinho tree-add")
+    local success, error_msg, start_failed =
+      require("claudinho").send_at_mention(file_path, nil, nil, "Claudinho tree-add")
     if success then
       success_count = success_count + 1
+    elseif start_failed then
+      return
     else
       logger.error(
         "command",
@@ -422,9 +419,12 @@ local function handle_tree_add_visual(visual_data)
   local total_count = #files
 
   for _, file_path in ipairs(files) do
-    local success, error_msg = require("claudinho").send_at_mention(file_path, nil, nil, "Claudinho tree-add_visual")
+    local success, error_msg, start_failed =
+      require("claudinho").send_at_mention(file_path, nil, nil, "Claudinho tree-add_visual")
     if success then
       success_count = success_count + 1
+    elseif start_failed then
+      return
     else
       logger.error(
         "command",
@@ -755,7 +755,7 @@ function M.complete(arg_lead, cmd_line, cursor_pos)
   elseif index == 2 then
     local sub = words[1]
     if sub == "tab" or sub == "tab-close" or sub == "tab-restart" then
-      for _, n in ipairs(tab_numbers()) do
+      for _, n in ipairs(sessions().numbers()) do
         local text = tostring(n)
         if text:sub(1, #arg_lead) == arg_lead then
           matches[#matches + 1] = text

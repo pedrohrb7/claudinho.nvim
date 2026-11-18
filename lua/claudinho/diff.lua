@@ -1229,6 +1229,11 @@ function M._write_proposal(tab_name, buffer)
     return
   end
   if diff_data.status == "pending" then
+    -- `:wqa` writes every buffer with changes, this one too; an exit does not accept a diff (set by `claudinho.sessions`).
+    if M.exit_in_progress then
+      logger.debug("diff", "Write of the proposal buffer ignored while Neovim exits: " .. tab_name)
+      return
+    end
     M._resolve_diff_as_saved(tab_name, buffer)
     return
   end
@@ -1995,9 +2000,9 @@ function M.open_diff_blocking(old_file_path, new_file_path, new_file_contents, t
     local response = require("claudinho.tools.init").build_response(resume_success, resume_result, resume_err)
     -- Use the global response sender to avoid module reloading issues
     local co_key = tostring(co)
-    if _G.claude_deferred_responses and _G.claude_deferred_responses[co_key] then
-      _G.claude_deferred_responses[co_key](response.error and response or response.result)
-      _G.claude_deferred_responses[co_key] = nil
+    if _G.claudinho_deferred_responses and _G.claudinho_deferred_responses[co_key] then
+      _G.claudinho_deferred_responses[co_key](response.error and response or response.result)
+      _G.claudinho_deferred_responses[co_key] = nil
     else
       logger.error("diff", "No global response sender found for coroutine:", co_key)
     end

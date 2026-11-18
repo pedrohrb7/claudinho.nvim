@@ -90,7 +90,17 @@ describe("health", function()
       },
       state = fake_state,
     }
-    package.loaded["claudinho.sessions"] = { state = { tabs = tabs } }
+    package.loaded["claudinho.sessions"] = {
+      state = { tabs = tabs },
+      numbers = function()
+        local list = {}
+        for n in pairs(tabs) do
+          list[#list + 1] = n
+        end
+        table.sort(list)
+        return list
+      end,
+    }
     package.loaded["claudinho.lockfile"] = { lock_dir = "/tmp/claude/ide" }
 
     package.loaded["claudinho.health"] = nil

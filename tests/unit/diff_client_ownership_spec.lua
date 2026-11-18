@@ -21,7 +21,7 @@ describe("a diff the user accepted for one Claude client", function()
 
   before_each(function()
     tools.register_all()
-    _G.claude_deferred_responses = {}
+    _G.claudinho_deferred_responses = {}
     local f = assert(io.open(file, "w"))
     f:write("line 1\nline 2\n")
     f:close()
@@ -29,7 +29,7 @@ describe("a diff the user accepted for one Claude client", function()
 
   after_each(function()
     diff._cleanup_all_active_diffs("test_cleanup")
-    _G.claude_deferred_responses = nil
+    _G.claudinho_deferred_responses = nil
     os.remove(file)
   end)
 
@@ -46,7 +46,7 @@ describe("a diff the user accepted for one Claude client", function()
     local deferred = call_tool(owner, "openDiff", open_diff_args(contents or "line 1\nline 2\naccepted line\n"))
     assert.is_true(deferred._deferred, "openDiff should wait for the user")
     local answer
-    _G.claude_deferred_responses[tostring(deferred.coroutine)] = function(response)
+    _G.claudinho_deferred_responses[tostring(deferred.coroutine)] = function(response)
       answer = response
     end
     if before_accept then
@@ -295,7 +295,7 @@ describe("a diff the user accepted for one Claude client", function()
         new_file_contents = "accepted\n",
         tab_name = tab_gone,
       })
-      _G.claude_deferred_responses[tostring(deferred.coroutine)] = function() end
+      _G.claudinho_deferred_responses[tostring(deferred.coroutine)] = function() end
       diff._resolve_diff_as_saved(tab_gone, diff._get_active_diffs()[tab_gone].new_buffer)
       diff.close_diffs_for_client(owner.id, "client disconnected")
       -- The file was opened read-only before its folder went away.
@@ -350,7 +350,7 @@ describe("a diff the user accepted for one Claude client", function()
         tab_name = relative_tab,
       })
       assert.is_true(deferred._deferred, "openDiff should wait for the user")
-      _G.claude_deferred_responses[tostring(deferred.coroutine)] = function() end
+      _G.claudinho_deferred_responses[tostring(deferred.coroutine)] = function() end
       vim.fn.getcwd = function()
         return dir .. "/issue363_other_dir"
       end

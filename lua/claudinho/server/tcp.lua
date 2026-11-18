@@ -189,6 +189,11 @@ function M.create_server(config, callbacks, auth_token, server_id)
   -- Short, so that it fits the command line at 80 columns: Neovim shows it at startup. libuv's error starts with its
   -- code ("EADDRINUSE: address already in use"), and the code alone says why.
   local code = last_reason and last_reason:match("^(%u+):") or last_reason or "unknown error"
+  if code == "EADDRINUSE" then
+    -- "No free port" already says it, and the shorter text fits the command line with the "[Claudinho] Could not start
+    -- Claude <n>: " prefix.
+    return nil, string.format("No free port in %d-%d", min_port, max_port)
+  end
   return nil, string.format("No free port in %d-%d (%s)", min_port, max_port, code)
 end
 

@@ -255,9 +255,7 @@ local function live()
   for n, s in pairs(sessions.state.tabs) do
     tabs[#tabs + 1] = { number = n, title = s.title, diff = #s.pending_diffs > 0, exited = s.state == "exited" }
   end
-  local plugin = package.loaded["claudinho"]
-  local config = type(plugin) == "table" and type(plugin.state) == "table" and plugin.state.config or nil
-  local window = (config or require("claudinho.config").defaults).window
+  local window = require("claudinho.config").current().window
   local win = vim.g.statusline_winid
   if type(win) ~= "number" or win == 0 or not vim.api.nvim_win_is_valid(win) then
     win = 0

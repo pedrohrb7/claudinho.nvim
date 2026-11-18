@@ -38,7 +38,14 @@ Claudinho.nvim is a hard fork of [claudecode.nvim](https://github.com/coder/clau
 ### Fixed
 
 - A key typed in a Claude terminal whose process just ended no longer wipes its buffer and closes the tab, and wiping the buffer of a tab no longer raises `E937: Attempt to delete a buffer that is in use`.
-- `:wqa` with running Claude tabs no longer stops with `E948: Job still running`: on `ExitPre` the plugin answers the pending diffs and stops the tab processes.
+- `:wqa` with running Claude tabs no longer stops with `E948: Job still running` when nothing can cancel the exit: on `ExitPre` the plugin rejects the pending diffs and stops the tab processes. With modified buffers, `:wqa` writes them and stops once with E948, with the tabs and diffs intact; run `:wqa` or `:qa` again to leave. `:qa` with modified buffers gives E37/E162 and keeps the tabs; `:qa!` leaves and ends them. Writing a diff proposal buffer while Neovim exits no longer accepts the diff.
+- A cancelled exit no longer ends the tabs or rejects their diffs.
+- The `--resume` session id is accepted only as a UUID and is passed to `claude` as one argument (`--resume=<id>`).
+- `:Claudinho tab-restart <n>` on a tab without a session id replies `Claude <n>: no session to resume, started a new one`.
+- Closing a tab answers `DIFF_REJECTED` to the diffs that wait for it.
+- A split opened from the Claude window no longer inherits its tab bar, statusline and window options.
+- A failed first start is reported once, and `add` and `tree-add` stop at the first file instead of repeating the error.
+- Claudinho's pending diffs no longer share a global with claudecode.nvim (`_G.claudinho_deferred_responses`).
 
 ### Removed
 

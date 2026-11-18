@@ -220,6 +220,7 @@ Os textos saem em inglês, como mensagens do plugin.
 - O status fica vazio enquanto a pasta não tem a confiança aceita no Claude, e também com `disableAllHooks` ou `allowManagedHooksOnly` nos settings. As abas funcionam do mesmo jeito, só sem o status.
 - Com `laststatus=3`, a statusline da janela do Claude só aparece quando ela está em foco; com `laststatus=0`, nunca.
 - Recarregar os módulos do plugin com abas abertas não é suportado: o estado em memória se perde e as abas antigas só fecham com o Neovim.
+- Com buffers modificados, `:wqa` grava os arquivos e para uma vez com E948, com as abas e os diffs intactos; rode `:wqa` ou `:qa` de novo para sair. `:qa` com buffers modificados dá E37/E162 e mantém as abas; `:qa!` sai e encerra as abas.
 - O token de cada aba fica no ambiente do processo do Claude e dos filhos dele (`CLAUDINHO_TOKEN`), a mesma fronteira do lock file, que o seu usuário já lê.
 
 ## Conexão do CLI e o `/ide`

@@ -18,7 +18,7 @@ describe("openDiff in a new tab", function()
     dir = vim.fn.tempname()
     vim.fn.mkdir(dir, "p")
     tools.register_all()
-    _G.claude_deferred_responses = {}
+    _G.claudinho_deferred_responses = {}
     local config = vim.deepcopy(require("claudinho.config").defaults)
     config.diff_opts.open_in_new_tab = true
     diff.setup(config)
@@ -46,7 +46,7 @@ describe("openDiff in a new tab", function()
     vim.cmd("silent! only!")
     vim.cmd("silent! %bwipeout!")
     vim.fn.delete(dir, "rf")
-    _G.claude_deferred_responses = nil
+    _G.claudinho_deferred_responses = nil
     package.loaded["claudinho.terminal"] = nil
   end)
 
@@ -90,7 +90,7 @@ describe("openDiff in a new tab", function()
     local call = open_diff()
     assert.is_true(call._deferred, vim.inspect(call.error))
     local answers = {}
-    _G.claude_deferred_responses[tostring(call.coroutine)] = function(response)
+    _G.claudinho_deferred_responses[tostring(call.coroutine)] = function(response)
       answers[#answers + 1] = response
     end
 

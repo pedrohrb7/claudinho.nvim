@@ -92,7 +92,7 @@ describe("a Claude client that disconnects while Neovim refuses window changes",
     end, 10)
     assert.is_true(closed, "the diffs closed once Neovim allowed window changes")
     assert.equal("", vim.v.errmsg)
-    assert.equal(0, vim.tbl_count(_G.claude_deferred_responses or {}), "no openDiff call is left waiting")
+    assert.equal(0, vim.tbl_count(_G.claudinho_deferred_responses or {}), "no openDiff call is left waiting")
     assert.equal(windows_before, #vim.api.nvim_list_wins(), "no diff window is left on screen")
   end
 
@@ -145,7 +145,7 @@ describe("a Claude client that disconnects while Neovim refuses window changes",
     vim.cmd("silent! only!")
     vim.cmd("silent! %bwipeout!")
     vim.fn.delete(dir, "rf")
-    _G.claude_deferred_responses = nil
+    _G.claudinho_deferred_responses = nil
   end)
 
   it("in the command-line window: its diffs close after the user leaves the window, with no error", function()

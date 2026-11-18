@@ -201,7 +201,7 @@ describe("Server lines on the command line", function()
     assert.equals(vim.log.levels.ERROR, line.level)
     -- The text comes from the session now, through notify.error: the module tag is gone, and the line is the reason
     -- (the server's own "No free port ..." text) after the tab's label.
-    assert.equals("Could not start Claude 1: No free port in 10000-10000 (EADDRINUSE)", line.text)
+    assert.equals("[Claudinho] Could not start Claude 1: No free port in 10000-10000", line.text)
   end)
 
   -- Without colors (a notify plugin, or :messages read through execute()), only the text tells an error from info.

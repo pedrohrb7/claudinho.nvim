@@ -20,7 +20,7 @@ describe("closing and saving a proposed diff", function()
       arguments = { old_file_path = file, new_file_path = file, new_file_contents = "one\nTWO\n", tab_name = tab },
     })
     assert.is_true(call._deferred, "openDiff waits for the user")
-    _G.claude_deferred_responses[tostring(call.coroutine)] = function(response)
+    _G.claudinho_deferred_responses[tostring(call.coroutine)] = function(response)
       answers[#answers + 1] = response
     end
     return diff._get_active_diffs()[tab]
@@ -74,7 +74,7 @@ describe("closing and saving a proposed diff", function()
     vim.fn.writefile({ "other" }, dir .. "/other.txt")
     vim.fn.writefile({ "third" }, dir .. "/third.txt")
     tools.register_all()
-    _G.claude_deferred_responses = {}
+    _G.claudinho_deferred_responses = {}
     answers = {}
     notices = {}
     real_notify = vim.notify
@@ -91,7 +91,7 @@ describe("closing and saving a proposed diff", function()
     vim.cmd("silent! %bwipeout!")
     vim.fn.delete(dir, "rf")
     vim.o.signcolumn = "auto"
-    _G.claude_deferred_responses = nil
+    _G.claudinho_deferred_responses = nil
   end)
 
   local layouts = { "vertical" }

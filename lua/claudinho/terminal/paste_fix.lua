@@ -131,7 +131,7 @@ function M.install()
       streaming = false
       -- Replay as a single non-streamed paste through the original handler so
       -- Neovim's own terminal paste delivers it (and decides whether to emit
-      -- bracketed-paste markers based on the child's state — which is not
+      -- bracketed-paste markers based on the child's state - which is not
       -- queryable from Lua). If focus has moved off the terminal since phase 1
       -- (e.g. a scheduled callback or a GUI/RPC paste stream), run the replay in
       -- the captured window via nvim_win_call so it still reaches the terminal

@@ -58,7 +58,7 @@ describe("openDiff in a new tab: terminal BufEnter handler", function()
     dir = vim.fn.tempname()
     vim.fn.mkdir(dir, "p")
     tools.register_all()
-    _G.claude_deferred_responses = {}
+    _G.claudinho_deferred_responses = {}
 
     vim.cmd("botright vsplit")
     local terminal_win = vim.api.nvim_get_current_win()
@@ -82,7 +82,7 @@ describe("openDiff in a new tab: terminal BufEnter handler", function()
     vim.cmd("silent! only!")
     vim.cmd("silent! %bwipeout!")
     vim.fn.delete(dir, "rf")
-    _G.claude_deferred_responses = nil
+    _G.claudinho_deferred_responses = nil
   end)
 
   local layouts = { "vertical", "unified" }

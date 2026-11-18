@@ -1,1 +1,4 @@
-{ "session_id": "s4", "model": { "id": "claude-3-5-haiku-20241022" } }
+{
+  "session_id": "123e4567-e89b-12d3-a456-426614174004",
+  "model": { "id": "claude-3-5-haiku-20241022" }
+}

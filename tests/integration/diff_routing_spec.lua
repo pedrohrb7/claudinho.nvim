@@ -135,6 +135,20 @@ describe("diff routing by tab", function()
     assert.same({}, first.pending_diffs)
   end)
 
+  it("answers DIFF_REJECTED to a waiting diff when its tab closes (rule 38)", function()
+    call_tool(client_1, 4, "openDiff", diff_arguments("a.txt"))
+    assert.is_true(vim.wait(2000, function()
+      return #first.pending_diffs == 1
+    end, 10))
+
+    assert.is_true(sessions.close(1))
+
+    local reply = assert(client_1:next_message())
+    assert.equals(4, reply.id)
+    assert.equals("DIFF_REJECTED", reply.result.content[1].text)
+    assert.equals("a.txt", reply.result.content[2].text)
+  end)
+
   it("answers the other tools on a tab in the background", function()
     assert.equals(second, sessions.active())
 

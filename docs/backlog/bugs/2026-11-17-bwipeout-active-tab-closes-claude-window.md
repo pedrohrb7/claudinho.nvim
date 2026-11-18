@@ -11,6 +11,8 @@
 
 Observed in review of the E937 fix; no command output recorded. Code path: `setup_autocmds` handler in `lua/claudinho/sessions.lua` calling `M.close(n)`.
 
+- Visto de novo / caso relacionado, NÃO VERIFICADO (2026-11-18, review, code-reviewer): `BufWipeout` da aba ativa com vizinha que tem diffs em espera executa close -> set_active -> open_pending -> open_diff_blocking (cria splits e buffers) dentro do autocmd de BufWipeout; o Neovim pode recusar mudanças de layout ali (estilo E1159). Evidência: `lua/claudinho/sessions.lua:519-523`. Precisa de reprodução.
+
 ## Steps to reproduce
 
 1. Open two Claude tabs.

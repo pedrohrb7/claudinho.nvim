@@ -27,7 +27,7 @@ describe("openDiff window sizes", function()
     end
     tools.register_all()
     require("claudinho.commands").setup({})
-    _G.claude_deferred_responses = {}
+    _G.claudinho_deferred_responses = {}
     -- The Claude terminal is a real tab, with its own private lock folder and a command that only waits.
     tab_env_dir = tab_env.new()
     saved_lock_dir = lockfile.lock_dir
@@ -52,7 +52,7 @@ describe("openDiff window sizes", function()
     vim.cmd("silent! only!")
     vim.cmd("silent! %bwipeout!")
     vim.fn.delete(dir, "rf")
-    _G.claude_deferred_responses = nil
+    _G.claudinho_deferred_responses = nil
   end)
 
   local function use_layout(layout, diff_opts)
@@ -90,7 +90,7 @@ describe("openDiff window sizes", function()
   local function open_diff(file, name)
     local call = call_open_diff(file, name)
     assert.is_true(call._deferred, vim.inspect(call.error))
-    _G.claude_deferred_responses[tostring(call.coroutine)] = function() end
+    _G.claudinho_deferred_responses[tostring(call.coroutine)] = function() end
     return diff._get_active_diffs()[name or tab_name]
   end
 

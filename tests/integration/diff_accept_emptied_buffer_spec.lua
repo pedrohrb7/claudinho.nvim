@@ -28,7 +28,7 @@ describe("the text a diff accepts after the user empties the proposal", function
       arguments = { old_file_path = file, new_file_path = file, new_file_contents = new_text, tab_name = tab },
     })
     assert.is_true(call._deferred, "openDiff waits for the user")
-    _G.claude_deferred_responses[tostring(call.coroutine)] = function(response)
+    _G.claudinho_deferred_responses[tostring(call.coroutine)] = function(response)
       answers[#answers + 1] = response
     end
     return diff._get_active_diffs()[tab]
@@ -69,7 +69,7 @@ describe("the text a diff accepts after the user empties the proposal", function
     dir = vim.fn.tempname()
     vim.fn.mkdir(dir, "p")
     tools.register_all()
-    _G.claude_deferred_responses = {}
+    _G.claudinho_deferred_responses = {}
     answers = {}
   end)
 
@@ -79,7 +79,7 @@ describe("the text a diff accepts after the user empties the proposal", function
     vim.cmd("silent! only!")
     vim.cmd("silent! %bwipeout!")
     vim.fn.delete(dir, "rf")
-    _G.claude_deferred_responses = nil
+    _G.claudinho_deferred_responses = nil
   end)
 
   local split_layouts = { "vertical", "horizontal" }

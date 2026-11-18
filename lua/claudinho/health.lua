@@ -123,12 +123,9 @@ end
 
 ---One line per tab: its process, port, clients and lock file.
 local function check_tabs()
-  local state = require("claudinho.sessions").state
-  local numbers = {}
-  for n in pairs(state.tabs) do
-    numbers[#numbers + 1] = n
-  end
-  table.sort(numbers)
+  local sessions = require("claudinho.sessions")
+  local state = sessions.state
+  local numbers = sessions.numbers()
 
   if #numbers == 0 then
     info("No Claude tabs open")

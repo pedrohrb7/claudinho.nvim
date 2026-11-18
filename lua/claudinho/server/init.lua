@@ -19,7 +19,7 @@ local M = {}
 ---@field auth_token string|nil
 ---@field tcp TCPServer|nil The object of server/tcp.lua
 ---@field ping_timer uv.uv_timer_t|nil
----@field deferred table<string, true> Keys this instance put in _G.claude_deferred_responses
+---@field deferred table<string, true> Keys this instance put in _G.claudinho_deferred_responses
 ---@field handlers table<string, function> JSON-RPC handlers by method name
 ---@field on_open fun(client: WebSocketClient)|nil A client finished its WebSocket handshake
 ---@field on_disconnect fun(client: WebSocketClient)|nil
@@ -189,9 +189,9 @@ function Server:stop()
   tcp_server.stop_server(self.tcp)
 
   -- CRITICAL: drop this instance's deferred responses to prevent memory leaks and hanging. Another instance's stay.
-  if _G.claude_deferred_responses then
+  if _G.claudinho_deferred_responses then
     for key in pairs(self.deferred) do
-      _G.claude_deferred_responses[key] = nil
+      _G.claudinho_deferred_responses[key] = nil
     end
   end
   self.deferred = {}
@@ -341,10 +341,10 @@ function Server:_setup_deferred_response(deferred_info)
   end
 
   -- Store the response sender in a global location that won't be affected by module reloading
-  if not _G.claude_deferred_responses then
-    _G.claude_deferred_responses = {}
+  if not _G.claudinho_deferred_responses then
+    _G.claudinho_deferred_responses = {}
   end
-  _G.claude_deferred_responses[key] = response_sender
+  _G.claudinho_deferred_responses[key] = response_sender
   self.deferred[key] = true
 
   logger.debug("server", "Stored response sender in global table for coroutine:", key)

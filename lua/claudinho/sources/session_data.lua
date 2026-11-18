@@ -102,6 +102,17 @@ function M.model_label(model)
   return display
 end
 
+---A session id is a UUID. Anything else is dropped: the id reaches the command line of `--resume` later.
+---@param value any
+---@return string|nil id
+local function session_id(value)
+  local id = str(value)
+  if id and id:match("^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$") then
+    return id
+  end
+  return nil
+end
+
 ---Data of one status line JSON.
 ---@param t table|nil
 ---@return ClaudinhoStatuslineData data
@@ -109,7 +120,7 @@ function M.from_statusline(t)
   t = type(t) == "table" and t or {}
   local effort = type(t.effort) == "table" and t.effort.level or nil
   return {
-    session_id = str(t.session_id),
+    session_id = session_id(t.session_id),
     model = M.model_label(t.model),
     effort = str(effort),
   }
@@ -121,7 +132,7 @@ end
 function M.from_hook(t)
   t = type(t) == "table" and t or {}
   return {
-    session_id = str(t.session_id),
+    session_id = session_id(t.session_id),
     mode = str(t.permission_mode),
   }
 end

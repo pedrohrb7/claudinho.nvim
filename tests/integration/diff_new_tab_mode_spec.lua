@@ -70,7 +70,7 @@ describe("openDiff in a new tab: mode", function()
       config.terminal.auto_insert = opts.auto_insert ~= false
       require("claudinho.diff").setup(config)
       require("claudinho.tools.init").register_all()
-      _G.claude_deferred_responses = {}
+      _G.claudinho_deferred_responses = {}
     ]],
       opts
     )

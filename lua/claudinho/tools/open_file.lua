@@ -601,7 +601,7 @@ local function handler(params)
       vim.cmd("wincmd j")
     end
 
-    -- If we're still in a special window (a diff window — issue #277 — or the preview window), create
+    -- If we're still in a special window (a diff window - issue #277 - or the preview window), create
     -- a new split so we don't :edit over a terminal, sidebar, someone's diff, or the preview window.
     local cur_win = vim.api.nvim_get_current_win()
     local buf = vim.api.nvim_win_get_buf(cur_win)

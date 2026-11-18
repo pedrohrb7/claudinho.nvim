@@ -30,7 +30,7 @@ describe("leaving a proposed diff", function()
       arguments = { old_file_path = path, new_file_path = path, new_file_contents = "one\nTWO\n", tab_name = tab },
     })
     assert.is_true(call._deferred, "openDiff waits for the user")
-    _G.claude_deferred_responses[tostring(call.coroutine)] = function(response)
+    _G.claudinho_deferred_responses[tostring(call.coroutine)] = function(response)
       answers[#answers + 1] = response
     end
     return diff._get_active_diffs()[tab]
@@ -67,7 +67,7 @@ describe("leaving a proposed diff", function()
     path = dir .. "/quit.txt"
     vim.fn.writefile({ "one", "two" }, path)
     tools.register_all()
-    _G.claude_deferred_responses = {}
+    _G.claudinho_deferred_responses = {}
     answers = {}
   end)
 
@@ -77,7 +77,7 @@ describe("leaving a proposed diff", function()
     vim.cmd("silent! only!")
     vim.cmd("silent! %bwipeout!")
     vim.fn.delete(dir, "rf")
-    _G.claude_deferred_responses = nil
+    _G.claudinho_deferred_responses = nil
   end)
 
   for _, layout in ipairs({ "vertical", "unified" }) do

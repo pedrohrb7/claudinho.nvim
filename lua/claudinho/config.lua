@@ -430,6 +430,15 @@ function M.normalize_new_keys(config)
   check(config, "notify", "notify", defaults.notify, is_boolean)
 end
 
+---The configuration of the running plugin, or the defaults before `setup`. It reads the plugin state without loading
+---the plugin.
+---@return ClaudinhoConfig
+function M.current()
+  local plugin = package.loaded["claudinho"]
+  local config = type(plugin) == "table" and type(plugin.state) == "table" and plugin.state.config or nil
+  return type(config) == "table" and config or M.defaults
+end
+
 ---Applies user configuration on top of default settings and validates the result.
 ---@param user_config table|nil The user-provided configuration table.
 ---@return ClaudinhoConfig config The final, validated configuration table.

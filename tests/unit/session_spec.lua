@@ -6,6 +6,7 @@
 require("tests.busted_setup")
 
 describe("session", function()
+  local SID = "123e4567-e89b-12d3-a456-426614174000"
   local session_module
   local loaded_names = {
     "claudinho.session",
@@ -144,6 +145,11 @@ describe("session", function()
       end,
       on_exit = function(session)
         table.insert(sessions_calls, { "on_exit", session })
+      end,
+      reject_waiting = function(session)
+        table.insert(sessions_calls, { "reject_waiting", session })
+        session.pending_diffs = {}
+        return 0
       end,
     }
 
@@ -423,6 +429,7 @@ describe("session", function()
             state.executable = 0
           end,
           message = "is not executable",
+          exact = "[Claudinho] Could not start Claude 1: 'claude' is not executable",
           log = {},
         },
         {
@@ -514,8 +521,11 @@ describe("session", function()
 
           assert.is_false(ok)
           assert.is_truthy(tostring(err):find(case.message, 1, true))
-          assert.is_truthy(tostring(err):find("^Could not start Claude 1: "))
+          assert.is_truthy(tostring(err):find("^%[Claudinho%] Could not start Claude 1: "))
           assert.is_truthy(tostring(err):find("Claude 1", 1, true))
+          if case.exact then
+            assert.equals(case.exact, err)
+          end
           assert.same(case.log, log)
           -- Nothing is left on the session.
           assert.equals("exited", session.state)
@@ -573,18 +583,24 @@ describe("session", function()
     end)
 
     it("merges the model and the session id of a statusline and tells the registry", function()
-      server_opts.on_post("statusline", '{"session_id":"s1","model":"Opus"}')
-      assert.equals("s1", session.data.session_id)
+      server_opts.on_post("statusline", '{"session_id":"' .. SID .. '","model":"Opus"}')
+      assert.equals(SID, session.data.session_id)
       assert.equals(1, #sessions_calls)
       assert.equals("on_change", sessions_calls[1][1])
       assert.equals(session, sessions_calls[1][2])
     end)
 
     it("does not erase what an earlier POST brought (rule 52)", function()
-      server_opts.on_post("hook", '{"session_id":"s1","permission_mode":"plan"}')
-      server_opts.on_post("statusline", '{"session_id":"s1"}')
+      server_opts.on_post("hook", '{"session_id":"' .. SID .. '","permission_mode":"plan"}')
+      server_opts.on_post("statusline", '{"session_id":"' .. SID .. '"}')
       assert.equals("plan", session.data.mode)
-      assert.equals("s1", session.data.session_id)
+      assert.equals(SID, session.data.session_id)
+    end)
+
+    it("drops a session id that is no UUID", function()
+      server_opts.on_post("statusline", '{"session_id":"--dangerously-skip-permissions","model":"Opus"}')
+      server_opts.on_post("hook", '{"session_id":"--settings=/tmp/x.json"}')
+      assert.is_nil(session.data.session_id)
     end)
 
     it("takes the new value of a field that changed", function()
@@ -764,7 +780,7 @@ describe("session", function()
 
     it("resumes the Claude session when the data has its id", function()
       local session = started()
-      session.data.session_id = "sid-9"
+      session.data.session_id = SID
       state.jobstart_calls[1].opts.on_exit(77, 0)
       state.jobstart_calls = {}
 
@@ -774,10 +790,20 @@ describe("session", function()
         "claude",
         "--settings",
         "/tmp/nvim.x/0.claudinho-1.json",
-        "--resume",
-        "sid-9",
+        "--resume=" .. SID,
       }, state.jobstart_calls[1].cmd)
       assert.equals("running", session.state)
+    end)
+
+    it("passes a hostile session id as no argument at all", function()
+      local session = started()
+      server_opts.on_post("hook", '{"session_id":"--dangerously-skip-permissions"}')
+      state.jobstart_calls[1].opts.on_exit(77, 0)
+      state.jobstart_calls = {}
+
+      assert.is_true((session_module.restart(session)))
+
+      assert.same({ "claude", "--settings", "/tmp/nvim.x/0.claudinho-1.json" }, state.jobstart_calls[1].cmd)
     end)
 
     it("starts without arguments when there is no session id", function()
@@ -880,16 +906,16 @@ describe("session", function()
 
     it("rejects the diffs that wait for the tab", function()
       local session = started()
-      local answer
       local co = coroutine.create(function()
-        answer = coroutine.yield()
+        coroutine.yield()
       end)
       coroutine.resume(co)
       session.pending_diffs = { { tab_name = "t", path = "/a", co = co } }
 
       session_module.close(session)
 
-      assert.equals("reject", answer)
+      -- The registry answers them, through the senders the server kept, so the client gets DIFF_REJECTED (rule 38).
+      assert.same({ { "reject_waiting", session } }, sessions_calls)
       assert.same({}, session.pending_diffs)
     end)
 

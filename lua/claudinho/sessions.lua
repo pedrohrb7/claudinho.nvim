@@ -51,7 +51,7 @@ end
 
 ---The tab numbers, in order.
 ---@return integer[]
-local function numbers()
+function M.numbers()
   local list = {}
   for n in pairs(M.state.tabs) do
     list[#list + 1] = n
@@ -67,14 +67,6 @@ local function free_number()
     n = n + 1
   end
   return n
-end
-
----The configuration of the running plugin, or the defaults before `setup`.
----@return ClaudinhoConfig
-local function plugin_config()
-  local plugin = package.loaded["claudinho"]
-  local config = type(plugin) == "table" and type(plugin.state) == "table" and plugin.state.config or nil
-  return config or require("claudinho.config").defaults
 end
 
 ---The path format of an @-mention, as the plugin does it, read when used because setup and tests replace it.
@@ -118,7 +110,7 @@ end
 local function resume_waiting(co, verdict)
   local ok, value, err = coroutine.resume(co, verdict)
   if coroutine.status(co) == "dead" then
-    local senders = _G.claude_deferred_responses
+    local senders = _G.claudinho_deferred_responses
     local key = tostring(co)
     local send = type(senders) == "table" and senders[key] or nil
     if send then
@@ -130,10 +122,11 @@ local function resume_waiting(co, verdict)
   return ok, ok and nil or value
 end
 
----Answer "reject" to the diffs of a tab that wait for it to become active, and forget them.
+---Answer "reject" to the diffs of a tab that wait for it to become active, and forget them. The answers leave through
+---the senders the server kept for them.
 ---@param s ClaudinhoSession
 ---@return integer count
-local function reject_waiting(s)
+function M.reject_waiting(s)
   local waiting = s.pending_diffs
   s.pending_diffs = {}
   local count = 0
@@ -188,7 +181,7 @@ end
 ---@return string|nil error
 function M.new(extra_args)
   local n = free_number()
-  local s = require("claudinho.session").new(n, plugin_config(), { format_path = format_path })
+  local s = require("claudinho.session").new(n, require("claudinho.config").current(), { format_path = format_path })
   local ok, err = require("claudinho.session").start(s, extra_args)
   if not ok then
     err = err or ("Could not start " .. label(n))
@@ -226,7 +219,7 @@ end
 ---Make the tab after (`step` 1) or before (`step` -1) the active one active, going round. With one tab or none, nothing.
 ---@param step integer
 local function move(step)
-  local list = numbers()
+  local list = M.numbers()
   if #list <= 1 then
     return
   end
@@ -266,7 +259,7 @@ function M.close(n, opts)
   end
   -- The neighbour that takes over: the next higher number, else the next lower one.
   local after, before
-  for _, number in ipairs(numbers()) do
+  for _, number in ipairs(M.numbers()) do
     if number > n and not after then
       after = number
     elseif number < n then
@@ -326,6 +319,7 @@ function M.restart(n)
   if win and type(win.unlock) == "function" then
     win.unlock()
   end
+  local had_session = s.data ~= nil and s.data.session_id ~= nil
   local ok, err = require("claudinho.session").restart(s)
   if not ok then
     redraw()
@@ -339,6 +333,9 @@ function M.restart(n)
   end
   register_server(s)
   redraw()
+  if not had_session then
+    notify.reply(label(n) .. ": no session to resume, started a new one")
+  end
   return true
 end
 
@@ -347,8 +344,8 @@ end
 ---@return integer count
 function M.reject_all_pending(_reason)
   local count = 0
-  for _, n in ipairs(numbers()) do
-    count = count + reject_waiting(M.state.tabs[n])
+  for _, n in ipairs(M.numbers()) do
+    count = count + M.reject_waiting(M.state.tabs[n])
   end
   if count > 0 then
     redraw()
@@ -388,7 +385,7 @@ local function reject_diffs(reason)
   end
   M.reject_all_pending(reason)
   local drain_ms = require("claudinho.session").DRAIN_MS
-  for _, n in ipairs(numbers()) do
+  for _, n in ipairs(M.numbers()) do
     local server = M.state.tabs[n].server
     if server then
       server:drain(drain_ms)
@@ -407,7 +404,7 @@ function M.kill_all()
     win.release(active.buf, nil)
   end
   local session = require("claudinho.session")
-  for _, n in ipairs(numbers()) do
+  for _, n in ipairs(M.numbers()) do
     session.close(M.state.tabs[n], "all tabs closed")
   end
   M.state.tabs = {}
@@ -487,23 +484,86 @@ local function tab_of_buffer(buf)
   return nil
 end
 
+---Whether the exit that fires `ExitPre` can still be cancelled (`:h ExitPre`: "Exiting may still be cancelled").
+---Neovim looks for changes to keep after the event: a buffer with changes that its change check counts (file, acwrite
+---and prompt buffers; not nofile, nowrite or terminal buffers) stops `:qa` with E37 or E162 and `:wqa` writes it and
+---then stops, and a terminal job that is not ours that still runs stops `:wqa` and `:xa` with E948. The proposal
+---buffers of the pending diffs do not count: they are rejected first, and that discards them. A forced exit (`:qa!`)
+---skips the check and needs nothing here: `VimLeavePre` ends the tabs.
+---@return boolean
+local function exit_can_be_cancelled()
+  local proposals = {}
+  local diff = package.loaded["claudinho.diff"]
+  if type(diff) == "table" and type(diff._get_active_diffs) == "function" then
+    for _, data in pairs(diff._get_active_diffs()) do
+      if data.status == "pending" and data.new_buffer then
+        proposals[data.new_buffer] = true
+      end
+    end
+  end
+  local ours = {}
+  for _, n in ipairs(M.numbers()) do
+    ours[M.state.tabs[n].buf or -1] = true
+  end
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(buf) and not proposals[buf] then
+      local buftype = vim.bo[buf].buftype
+      if buftype == "terminal" then
+        local job = vim.b[buf].terminal_job_id
+        if not ours[buf] and job and vim.fn.jobwait({ job }, 0)[1] == -1 then
+          return true
+        end
+      elseif vim.bo[buf].modified and buftype ~= "nofile" and buftype ~= "nowrite" then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+---Say to the diff module that an exit is going on, so a write of a proposal buffer (`:wqa` writes every buffer with
+---changes) does not accept its diff. The flag goes when the command that fired `ExitPre` is over: `SafeState` comes
+---when Neovim waits for input again, not while the command spins the loop (`vim.wait` in a `BufWritePre`).
+local function guard_proposals_while_exiting()
+  local diff = package.loaded["claudinho.diff"]
+  if type(diff) ~= "table" then
+    return
+  end
+  diff.exit_in_progress = true
+  vim.api.nvim_create_autocmd("SafeState", {
+    once = true,
+    callback = function()
+      diff.exit_in_progress = false
+    end,
+  })
+end
+
+---`ExitPre`: when nothing can cancel the exit, reject the diffs and stop the processes of every tab, now - Neovim
+---looks for running jobs right after this event, and `:wqa` and `:xa` would stop with E948 (rule 46). When something
+---can cancel it, nothing ends: `:qa` gives E37 or E162, `:wqa` writes the files and gives E948 once, the tabs and the
+---diffs stay as they are, and the next `:wqa` or `:qa` finds nothing left and exits. The sessions stay registered;
+---`VimLeavePre` closes them.
+local function on_exit_pre()
+  guard_proposals_while_exiting()
+  if exit_can_be_cancelled() then
+    return
+  end
+  reject_diffs("Neovim exiting")
+  for _, n in ipairs(M.numbers()) do
+    local job = M.state.tabs[n].job
+    if job then
+      pcall(vim.fn.jobstop, job)
+    end
+  end
+end
+
 ---The autocmds that end the tabs with Neovim and with their buffers (rule 46). Calling it again replaces them.
 function M.setup_autocmds()
   local group = vim.api.nvim_create_augroup(AUGROUP, { clear = true })
-  -- `ExitPre` comes before Neovim leaves, while the sessions are alive: the diffs answer and the writes go out. The
-  -- processes are stopped here too, after the answers: `:wqa` checks for running terminal jobs after `ExitPre` and
-  -- would stop with E948 (rule 46). The sessions stay registered; `VimLeavePre` closes them.
+  -- See `on_exit_pre`.
   vim.api.nvim_create_autocmd("ExitPre", {
     group = group,
-    callback = function()
-      reject_diffs("Neovim exiting")
-      for _, n in ipairs(numbers()) do
-        local job = M.state.tabs[n].job
-        if job then
-          pcall(vim.fn.jobstop, job)
-        end
-      end
-    end,
+    callback = on_exit_pre,
   })
   -- The rest of the end: processes, servers, lock files and settings files.
   vim.api.nvim_create_autocmd("VimLeavePre", {

@@ -1,5 +1,5 @@
 {
-  "session_id": "s1",
+  "session_id": "123e4567-e89b-12d3-a456-426614174000",
   "hook_event_name": "SomethingNew",
   "permission_mode": "auto",
   "payload": { "x": [1, 2] }

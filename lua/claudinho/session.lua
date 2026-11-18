@@ -23,6 +23,14 @@ local function label(session)
   return "Claude " .. session.number
 end
 
+---The text of a failed start (spec section 4).
+---@param session ClaudinhoSession
+---@param reason string
+---@return string
+local function start_error(session, reason)
+  return "[Claudinho] Could not start " .. label(session) .. ": " .. reason
+end
+
 ---Tell `claudinho.sessions` about a change. The module comes with the tab registry: without it nothing happens.
 ---@param method "on_change"|"on_exit"
 ---@param session ClaudinhoSession
@@ -224,7 +232,7 @@ end
 ---Start the session: the server, the lock file, the settings file, the buffer and the job, or nothing at all. On
 ---failure everything that was made is undone, in the inverse order, and the session is as before.
 ---@param session ClaudinhoSession
----@param extra_args string|nil Arguments for the command, with a leading space, already shell-escaped
+---@param extra_args string|string[]|nil Arguments for the command: a shell-escaped string (split into words), or a list of words that reach the command as they are
 ---@return boolean ok
 ---@return string|nil error
 function M.start(session, extra_args)
@@ -234,8 +242,7 @@ function M.start(session, extra_args)
 
   local argv = utils.parse_command(session.base_cmd)
   if #argv == 0 or vim.fn.executable(argv[1]) ~= 1 then
-    return false,
-      "Could not start " .. label(session) .. ": `" .. tostring(argv[1] or session.base_cmd) .. "` is not executable"
+    return false, start_error(session, "'" .. tostring(argv[1] or session.base_cmd) .. "' is not executable")
   end
 
   -- What was made so far, undone in the inverse order by `undo`.
@@ -263,7 +270,7 @@ function M.start(session, extra_args)
 
   local token_ok, token = pcall(lockfile.generate_auth_token)
   if not token_ok then
-    return false, "Could not start " .. label(session) .. ": " .. tostring(token)
+    return false, start_error(session, tostring(token))
   end
 
   local server = require("claudinho.server.init").new({
@@ -284,7 +291,7 @@ function M.start(session, extra_args)
   })
   local started, port = server:start(config, token)
   if not started then
-    return false, "Could not start " .. label(session) .. ": " .. tostring(port)
+    return false, start_error(session, tostring(port))
   end
   made.server = server
   -- A started server answers with its port; the error text is only for a failed start.
@@ -295,13 +302,13 @@ function M.start(session, extra_args)
     workspace_folders = lockfile.get_workspace_folders(session.cwd),
   })
   if not lock_ok then
-    return undo("Could not start " .. label(session) .. ": " .. tostring(lock_result))
+    return undo(start_error(session, tostring(lock_result)))
   end
   made.lock_port = port
 
   local settings_path, settings_err = require("claudinho.session_settings").write(session)
   if not settings_path then
-    return undo("Could not start " .. label(session) .. ": " .. tostring(settings_err))
+    return undo(start_error(session, tostring(settings_err)))
   end
   made.settings = true
 
@@ -312,7 +319,11 @@ function M.start(session, extra_args)
   end
   table.insert(cmd, "--settings")
   table.insert(cmd, settings_path)
-  if extra_args and extra_args ~= "" then
+  if type(extra_args) == "table" then
+    for _, word in ipairs(extra_args) do
+      table.insert(cmd, word)
+    end
+  elseif extra_args and extra_args ~= "" then
     for _, word in ipairs(utils.parse_command(extra_args)) do
       table.insert(cmd, word)
     end
@@ -343,15 +354,15 @@ function M.start(session, extra_args)
     end
   end)
   if not call_ok then
-    return undo("Could not start " .. label(session) .. ": " .. tostring(call_err))
+    return undo(start_error(session, tostring(call_err)))
   end
   if type(job) ~= "number" or job <= 0 then
-    return undo("Could not start " .. label(session) .. ": the command did not start")
+    return undo(start_error(session, "the command did not start"))
   end
   made.job = job
   if not vim.api.nvim_buf_is_valid(buf) then
     made.buf = nil
-    return undo("Could not start " .. label(session) .. ": its buffer was deleted while it started")
+    return undo(start_error(session, "its buffer was deleted while it started"))
   end
 
   vim.bo[buf].filetype = "claudinho"
@@ -387,7 +398,8 @@ function M.restart(session)
   end
   local old_buf = session.buf
   local session_id = session.data.session_id
-  local extra = session_id and (" --resume " .. vim.fn.shellescape(session_id)) or nil
+  -- One argv word: `--resume` takes an optional value, so a separate word could be read as a flag.
+  local extra = session_id and { "--resume=" .. session_id } or nil
   local ok, err = M.start(session, extra)
   if not ok then
     return false, err
@@ -418,15 +430,9 @@ function M.close(session, reason, opts)
   reason = reason or "session closed"
 
   -- The diffs that wait for the tab to become active answer "reject" now (rule 34).
-  local waiting = session.pending_diffs
-  session.pending_diffs = {}
-  for _, pending in ipairs(waiting) do
-    if type(pending.co) == "thread" and coroutine.status(pending.co) == "suspended" then
-      local ok, err = coroutine.resume(pending.co, "reject")
-      if not ok then
-        logger.error("session", "A waiting diff of " .. label(session) .. " failed to reject: " .. tostring(err))
-      end
-    end
+  local ok_sessions, sessions = pcall(require, "claudinho.sessions")
+  if ok_sessions and type(sessions.reject_waiting) == "function" then
+    sessions.reject_waiting(session)
   end
 
   -- The open diffs: rejected through their client, then the write queues empty so the answers leave.

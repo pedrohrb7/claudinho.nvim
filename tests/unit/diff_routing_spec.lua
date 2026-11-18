@@ -46,7 +46,7 @@ describe("diff routing by tab", function()
     local ok, result = coroutine.resume(co)
     assert.is_true(ok, tostring(result))
     if coroutine.status(co) == "suspended" then
-      _G.claude_deferred_responses[tostring(co)] = function(response)
+      _G.claudinho_deferred_responses[tostring(co)] = function(response)
         table.insert(sent, { name = name, response = response })
       end
       return co, nil
@@ -60,8 +60,8 @@ describe("diff routing by tab", function()
       saved_loaded[name] = package.loaded[name]
       package.loaded[name] = nil
     end
-    saved_senders = _G.claude_deferred_responses
-    _G.claude_deferred_responses = {}
+    saved_senders = _G.claudinho_deferred_responses
+    _G.claudinho_deferred_responses = {}
     log, notices, refreshes, sent = {}, {}, 0, {}
 
     package.loaded["claudinho.notify"] = {
@@ -106,7 +106,7 @@ describe("diff routing by tab", function()
   end)
 
   after_each(function()
-    _G.claude_deferred_responses = saved_senders
+    _G.claudinho_deferred_responses = saved_senders
     for _, name in ipairs(loaded_names) do
       package.loaded[name] = saved_loaded[name]
     end

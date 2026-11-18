@@ -19,7 +19,7 @@ describe("close_tab", function()
 
   before_each(function()
     tools.register_all()
-    _G.claude_deferred_responses = {}
+    _G.claudinho_deferred_responses = {}
     local f = assert(io.open(file, "w"))
     f:write("line 1\n")
     f:close()
@@ -27,7 +27,7 @@ describe("close_tab", function()
 
   after_each(function()
     diff._cleanup_all_active_diffs("test_cleanup")
-    _G.claude_deferred_responses = nil
+    _G.claudinho_deferred_responses = nil
     vim._buffers[user_buffer] = nil
     os.remove(file)
   end)
@@ -42,7 +42,7 @@ describe("close_tab", function()
     local deferred = tools.handle_invoke(client, { name = "openDiff", arguments = args })
     assert.is_true(deferred._deferred, "openDiff should wait for the user")
     local answer
-    _G.claude_deferred_responses[tostring(deferred.coroutine)] = function(response)
+    _G.claudinho_deferred_responses[tostring(deferred.coroutine)] = function(response)
       answer = response
     end
 
