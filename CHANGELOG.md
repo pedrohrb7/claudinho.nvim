@@ -8,6 +8,8 @@ Claudinho.nvim is a hard fork of [claudecode.nvim](https://github.com/coder/clau
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-18
+
 ### Added
 
 - The `left` layout: `window.layout = "left"` opens the Claude window on the left edge, over the whole height, beside every editor split. It is the mirror of `right` and has its own sizes, `window.left.width` and `window.left.diff_width` (both validated whatever layout is in use). The default layout is still `right`.
@@ -80,5 +82,6 @@ Claudinho.nvim is a hard fork of [claudecode.nvim](https://github.com/coder/clau
 - `diff_opts.auto_close_on_accept` and `diff_opts.show_diff_stats`: they had no effect.
 - `queue_timeout`: it had no effect.
 
-[Unreleased]: https://github.com/pedrohrb7/claudinho.nvim/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/pedrohrb7/claudinho.nvim/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/pedrohrb7/claudinho.nvim/releases/tag/v0.2.0
 [0.1.0]: https://github.com/pedrohrb7/claudinho.nvim/releases/tag/v0.1.0
