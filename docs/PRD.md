@@ -92,15 +92,16 @@ Regra pros adapters: cada um tem uma implementação nativa e uma interface pequ
 
 As fases são áreas do plugin, entregues como features em sequência, sem datas fixas. Cada feature só fecha quando o plugin está em uso na sua config. A numeração das fases é estável e é a que os planos citam.
 
-| Ordem | Feature                                                 | Fases                                                      |
-| ----- | ------------------------------------------------------- | ---------------------------------------------------------- |
-| 1     | [Fork limpo](features/fork-limpo/plan.md)               | 0                                                          |
-| 2     | [UI base](features/base-ui/plan.md)                     | 1, 5 e parte da 3                                          |
-| 3     | [Status interativo](features/status-interativo/plan.md) | parte da 3 (modo ao vivo) e parte da 4 (cliques no status) |
-| 4     | [Aba com opções](features/aba-com-opcoes/plan.md)       | parte da 5 (`:Claudinho new` com opções do `claude`)       |
-| 5     | Diff                                                    | 2                                                          |
-| 6     | Painel de informações                                   | resto da 3                                                 |
-| 7     | Envio de contexto e mouse                               | resto da 4                                                 |
+| Ordem | Feature                                                 | Fases                                                              |
+| ----- | ------------------------------------------------------- | ------------------------------------------------------------------ |
+| 1     | [Fork limpo](features/fork-limpo/plan.md)               | 0                                                                  |
+| 2     | [UI base](features/base-ui/plan.md)                     | 1, 5 e parte da 3                                                  |
+| 3     | [Status interativo](features/status-interativo/plan.md) | parte da 3 (modo ao vivo) e parte da 4 (cliques no status)         |
+| 4     | [Aba com opções](features/aba-com-opcoes/plan.md)       | parte da 5 (`:Claudinho new` com opções do `claude`)               |
+| 5     | [Perfis de aba](features/perfis-de-aba/plan.md)         | parte da 5 (perfis nomeados no `setup`, `:Claudinho new <perfil>`) |
+| 6     | Diff                                                    | 2                                                                  |
+| 7     | Painel de informações                                   | resto da 3                                                         |
+| 8     | Envio de contexto e mouse                               | resto da 4                                                         |
 
 O status de cada plano e spec fica no Index de `docs/features/README.md`.
 
@@ -120,7 +121,9 @@ Fase 1 · Janela do terminal, Fase 5 · Comandos e parte da Fase 3 (status): pla
 
 Parte da Fase 3 (modo atualizado ao vivo, lido do rodapé da TUI) e parte da Fase 4 (modelo, esforço e modo clicáveis na statusline da janela do Claude): plano do Status interativo.
 
-Parte da Fase 5 (abrir uma aba já configurada, `:Claudinho new --model sonnet --effort medium --permission-mode plan`, com completion e as opções mantidas no `tab-restart`): plano da Aba com opções. Os perfis nomeados na config (`:Claudinho new <perfil>`) ficam para uma feature seguinte.
+Parte da Fase 5 (abrir uma aba já configurada, `:Claudinho new --model sonnet --effort medium --permission-mode plan`, com completion e as opções mantidas no `tab-restart`): plano da Aba com opções.
+
+Parte da Fase 5 (perfis nomeados no `setup`, `:Claudinho new review`, combináveis com as opções do `new` e mantidos no `tab-restart`): plano dos Perfis de aba.
 
 ## Áreas de UX
 

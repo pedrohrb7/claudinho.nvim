@@ -18,6 +18,7 @@ One folder per feature or technical change, named `<slug>/` (kebab-case, no date
 
 | Feature                                        | Plan        | Spec        | Updated    |
 | ---------------------------------------------- | ----------- | ----------- | ---------- |
+| [perfis-de-aba](perfis-de-aba/plan.md)         | Draft       | -           | 2026-11-19 |
 | [aba-com-opcoes](aba-com-opcoes/plan.md)       | Draft       | -           | 2026-11-19 |
 | [status-interativo](status-interativo/plan.md) | Draft       | -           | 2026-11-19 |
 | [base-ui](base-ui/plan.md)                     | Implemented | Implemented | 2026-11-18 |
