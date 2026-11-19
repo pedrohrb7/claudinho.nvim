@@ -97,9 +97,10 @@ As fases são áreas do plugin, entregues como features em sequência, sem datas
 | 1     | [Fork limpo](features/fork-limpo/plan.md)               | 0                                                          |
 | 2     | [UI base](features/base-ui/plan.md)                     | 1, 5 e parte da 3                                          |
 | 3     | [Status interativo](features/status-interativo/plan.md) | parte da 3 (modo ao vivo) e parte da 4 (cliques no status) |
-| 4     | Diff                                                    | 2                                                          |
-| 5     | Painel de informações                                   | resto da 3                                                 |
-| 6     | Envio de contexto e mouse                               | resto da 4                                                 |
+| 4     | [Aba com opções](features/aba-com-opcoes/plan.md)       | parte da 5 (`:Claudinho new` com opções do `claude`)       |
+| 5     | Diff                                                    | 2                                                          |
+| 6     | Painel de informações                                   | resto da 3                                                 |
+| 7     | Envio de contexto e mouse                               | resto da 4                                                 |
 
 O status de cada plano e spec fica no Index de `docs/features/README.md`.
 
@@ -118,6 +119,8 @@ Fase 0 · Fork limpo (detalhe no plano):
 Fase 1 · Janela do terminal, Fase 5 · Comandos e parte da Fase 3 (status): plano da UI base. A fundação técnica (`events.lua`, `sources/ide_protocol.lua`, interfaces de `ui/adapters` com implementação nativa) entra quando e como a spec da UI base decidir.
 
 Parte da Fase 3 (modo atualizado ao vivo, lido do rodapé da TUI) e parte da Fase 4 (modelo, esforço e modo clicáveis na statusline da janela do Claude): plano do Status interativo.
+
+Parte da Fase 5 (abrir uma aba já configurada, `:Claudinho new --model sonnet --effort medium --permission-mode plan`, com completion e as opções mantidas no `tab-restart`): plano da Aba com opções. Os perfis nomeados na config (`:Claudinho new <perfil>`) ficam para uma feature seguinte.
 
 ## Áreas de UX
 
