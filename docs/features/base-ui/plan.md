@@ -9,6 +9,7 @@
 - **Addendum 2026-11-15 (2):** revisão da spec: errata da regra 85 repetida (a da seção 5 passa a ser a 89), `autoConnectIde` aceito e documentado, opções de diretório removidas, dois Neovims na mesma pasta documentados e o critério "nada muda fora das sessões do plugin" medido com o stub. Ver [Addendum](#addendum-2026-11-15-2-revisão-da-spec).
 - **Addendum 2026-11-17:** layout `left`, espelho do `right`, com tamanhos próprios em `window.left` (`width`, `diff_width`), decidido pelo usuário dentro desta feature. Ver [Addendum](#addendum-2026-11-17-layout-left).
 - **Addendum 2026-11-17 (2):** a janela do Claude fica sempre na borda do layout (`right`, `left` e `bottom`): quando outra janela toma a borda, o plugin a devolve, uma vez por mudança, sem opção para desligar. Ver [Addendum](#addendum-2026-11-17-2-janela-do-claude-sempre-na-borda).
+- **Addendum 2026-11-18:** a feature [status-interativo](../status-interativo/plan.md) muda a regra 66 (`select-model` passa pela guarda da TUI) e acrescenta `select-effort` e `mode-next` à tabela da regra 64, valendo quando ela for entregue. Ver [Addendum](#addendum-2026-11-18-guarda-no-select-model-e-subcomandos-novos).
 
 ## Goal
 
@@ -627,3 +628,13 @@ Acrescenta ao **Goal**:
 | Mover a janela muda tamanhos que o usuário ou o diff acertaram                                            | Explorer ou diff com largura errada depois da correção                 | Regras 106 e 107; o teste do critério confere os tamanhos das duas janelas, e a spec cobre a correção durante um diff aberto e o fechamento do diff (volta dos tamanhos) |
 
 A spec atualiza junto o que dizia "não reposiciona": a tabela de explorers da seção 15 e o roteiro manual do layout `left`. Os dois READMEs explicam que a janela do Claude volta sozinha à borda e o limite da regra 111, e a mudança entra em `## [Unreleased]` no `CHANGELOG.md` (regra 78).
+
+## Addendum 2026-11-18: guarda no `select-model` e subcomandos novos
+
+Origem: decisão do usuário em 2026-11-18, no plano da feature [status-interativo](../status-interativo/plan.md) (Draft). Este adendo só aponta o que muda aqui; as regras ficam naquele plano e valem quando ele for entregue. Até lá, as regras abaixo continuam como estão. O texto aprovado acima não foi reescrito.
+
+| Regra desta feature                          | O que muda                                                                                                                                                                                                                                                                           | Onde está a regra nova            |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------- |
+| 66 (`select-model`)                          | Com uma aba ativa rodando, o `/model <valor>` só é enviado com o campo de prompt do Claude à vista, vazio e sem diálogo aberto, checado antes de abrir a escolha e de novo depois dela; senão nada é enviado e uma resposta curta explica. Sem abas e com a aba encerrada, nada muda | status-interativo, regras 9 a 15  |
+| 64 (tabela de subcomandos) e 68 (completion) | Entram `select-effort` (abre o seletor `/effort` do Claude na aba ativa) e `mode-next` (Shift+Tab na aba ativa), com completion e a mesma guarda                                                                                                                                     | status-interativo, regras 17 a 28 |
+| 69 (preset)                                  | Decidido pelo usuário em 2026-11-19: o preset opcional ganha `<leader>ae` (`select-effort`) e `<leader>ap` (`mode-next`), com a mesma proteção contra tecla já mapeada; desligado por padrão, como hoje                                                                              | status-interativo, regra 28       |

@@ -16,7 +16,8 @@ One folder per feature or technical change, named `<slug>/` (kebab-case, no date
 
 ## Index
 
-| Feature                          | Plan        | Spec        | Updated    |
-| -------------------------------- | ----------- | ----------- | ---------- |
-| [base-ui](base-ui/plan.md)       | Implemented | Implemented | 2026-11-18 |
-| [fork-limpo](fork-limpo/plan.md) | Implemented | Implemented | 2026-11-15 |
+| Feature                                        | Plan        | Spec        | Updated    |
+| ---------------------------------------------- | ----------- | ----------- | ---------- |
+| [status-interativo](status-interativo/plan.md) | Draft       | -           | 2026-11-19 |
+| [base-ui](base-ui/plan.md)                     | Implemented | Implemented | 2026-11-18 |
+| [fork-limpo](fork-limpo/plan.md)               | Implemented | Implemented | 2026-11-15 |
