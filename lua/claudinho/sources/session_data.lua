@@ -1,6 +1,6 @@
 ---@brief [[
 --- Reads the JSON that Claude Code sends to the status line command and to the hooks, and keeps only what the plugin
---- shows: the session id, the model, the effort and the permission mode. A field that is missing, has the wrong type
+--- shows: the session id, the model, the effort, the usage limits, the vim mode and the permission mode. A field that is missing, has the wrong type
 --- or is new never raises an error; what is missing is simply left out.
 ---@brief ]]
 ---@module 'claudinho.sources.session_data'
@@ -10,6 +10,8 @@ local M = {}
 ---@field session_id string|nil
 ---@field model string|nil Label such as "Opus 5.5"
 ---@field effort string|nil
+---@field rate_limits ClaudinhoRateLimits|nil Nil when the JSON has no usable `rate_limits` object
+---@field vim_mode string|nil Raw `vim.mode` ("INSERT", "NORMAL"), when Claude Code runs in vim editor mode
 
 ---@class ClaudinhoHookData
 ---@field session_id string|nil
@@ -113,6 +115,52 @@ local function session_id(value)
   return nil
 end
 
+---Finite number check (rejects NaN and infinity).
+---@param value any
+---@return boolean
+local function finite(value)
+  return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
+end
+
+---One usage window, or nil when `used_percentage` is not a finite number >= 0.
+---@param w any
+---@return ClaudinhoUsageWindow|nil
+local function usage_window(w)
+  if type(w) ~= "table" or not finite(w.used_percentage) or w.used_percentage < 0 then
+    return nil
+  end
+  local resets_at = w.resets_at
+  if not finite(resets_at) or resets_at <= 0 then
+    resets_at = nil
+  end
+  return { used = w.used_percentage, resets_at = resets_at }
+end
+
+---True for the empty table `vim.empty_dict()` makes (what the JSON decoder gives for `{}`).
+---@param t table
+---@return boolean
+local function is_empty_dict(t)
+  if next(t) ~= nil or type(vim.empty_dict) ~= "function" then
+    return false
+  end
+  local mt = getmetatable(t)
+  return mt ~= nil and mt == getmetatable(vim.empty_dict())
+end
+
+---Usage windows of the `rate_limits` field. Nil means absent (not a JSON object, or an array), so the caller keeps
+---its previous value; a table, possibly empty, means "these are the windows now".
+---@param t any
+---@return ClaudinhoRateLimits|nil
+function M.rate_limits(t)
+  if type(t) ~= "table" or t[1] ~= nil then
+    return nil
+  end
+  if next(t) == nil and not is_empty_dict(t) then
+    return nil
+  end
+  return { five_hour = usage_window(t.five_hour), seven_day = usage_window(t.seven_day) }
+end
+
 ---Data of one status line JSON.
 ---@param t table|nil
 ---@return ClaudinhoStatuslineData data
@@ -123,6 +171,8 @@ function M.from_statusline(t)
     session_id = session_id(t.session_id),
     model = M.model_label(t.model),
     effort = str(effort),
+    rate_limits = M.rate_limits(t.rate_limits),
+    vim_mode = str(type(t.vim) == "table" and t.vim.mode or nil),
   }
 end
 

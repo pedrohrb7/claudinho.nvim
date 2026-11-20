@@ -1,7 +1,7 @@
 # Status interativo: statusline clicável, modo ao vivo, comandos de esforço e modo e limites de uso - spec técnica
 
 - **Date:** 2026-11-19
-- **Status:** Draft
+- **Status:** In progress
 - **Plan:** [plan.md](plan.md)
 - **Implementation log:** [log.md](log.md)
 - **Decisões do usuário (2026-11-19):** na janela estreita, os itens de uso saem um de cada vez, o `7d` primeiro (antiga pergunta 2). As sugestões de prompt do Claude ficam ligadas por padrão, como no claudecode.nvim, e uma opção nova do plugin, `terminal.prompt_suggestions`, as desliga (antiga pergunta 1, seção 8). Com elas ligadas, a guarda nunca pode tomar o texto cinza por texto digitado nem mandar teclas por cima de texto real: a medição dos sinais possíveis (F17 a F19) mostrou que nenhum separa os dois em todos os casos, e o usuário decidiu que todo texto visível depois de `❯` conta como digitado, sem exceção para o exemplo `Try "..."` do início ([Open questions](#open-questions)).
@@ -536,7 +536,7 @@ Stacks fora da lista do template, como na base-ui: `test-runner` para medição 
 - **Files:** nenhum arquivo do repo (os números vão para `log.md`, escrito pelo `/implement`)
 - **Depends on:** -
 - **Done when:** o `log.md` registra, sobre o `HEAD` e com `BUSTED_SEED=12345 CI=true`: totais do `unit` (sucessos, falhas, erros, pendentes) e o tempo; warnings do `check`; cobertura total e por arquivo de `lua/claudinho/`; totais do `integration` no 0.12.3; `claude --version`
-- **Status:** pending
+- **Status:** done
 
 ### Task 2 - Fixtures de tela medidas e script de captura
 
@@ -544,7 +544,7 @@ Stacks fora da lista do template, como na base-ui: `test-runner` para medição 
 - **Files:** `tests/fixtures/tui/2.1.328/*.txt`, `scripts/dump_tui_screen.lua`
 - **Depends on:** Task 1
 - **Done when:** as telas da seção 11 estão em `tests/fixtures/tui/2.1.328/` (uma por arquivo, com U+00A0 real depois de `❯`, sem travessão; nomes como `start_auto.txt`, `start_no_suggestion.txt`, `manual.txt`, `accept_edits.txt`, `plan.txt`, `typed_text.txt`, `multiline.txt`, `slash_menu.txt`, `empty_after_esc.txt`, `ctrl_c.txt`, `effort_picker.txt`, `model_picker.txt`, `bypass_accept.txt`); o comentário de cabeçalho de `scripts/dump_tui_screen.lua` (em inglês) diz de onde vêm as fixtures e como capturar uma nova (a origem de cada tela medida está na seção 11 desta spec); `scripts/dump_tui_screen.lua`, rodado com `:luafile scripts/dump_tui_screen.lua <nome>` numa sessão real do claudinho, grava as últimas 120 linhas do buffer da aba ativa em `tests/fixtures/tui/<versão do claude>/<nome>.txt` (a versão vem de `claude --version`), recusa sobrescrever um arquivo que existe e não envia nada; `check` e `format` verdes
-- **Status:** pending
+- **Status:** done
 
 ### Task 3 - Captura das telas que faltam
 
@@ -568,7 +568,7 @@ Stacks fora da lista do template, como na base-ui: `test-runner` para medição 
 - **Files:** `lua/claudinho/sources/session_data.lua`, `lua/claudinho/types.lua`, `tests/unit/sources/session_data_spec.lua`, `tests/fixtures/claude/statusline_*.json`
 - **Depends on:** Task 1
 - **Done when:** a seção 4 "Dado" está aplicada; fixtures novas `statusline_rate_limits_both.json`, `statusline_rate_limits_one.json`, `statusline_rate_limits_empty.json`, `statusline_rate_limits_wrong_types.json` e `statusline_vim_normal.json`; os casos de `session_data_spec` passam, os antigos sem mudança; gate verde (`check`, `unit`, `format`)
-- **Status:** pending
+- **Status:** done
 
 ### Task 6 - Valor único de uso e relógio de reset
 
@@ -576,7 +576,7 @@ Stacks fora da lista do template, como na base-ui: `test-runner` para medição 
 - **Files:** `lua/claudinho/usage.lua`, `lua/claudinho/types.lua`, `tests/unit/usage_spec.lua`
 - **Depends on:** Task 5
 - **Done when:** a seção 4 "Estado" está aplicada; `usage_spec` passa com timer e relógio trocados no teste; nenhum dado de uso vai a log ou disco; gate verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 7 - Statusline: regiões, uso, cores e largura
 
@@ -584,7 +584,7 @@ Stacks fora da lista do template, como na base-ui: `test-runner` para medição 
 - **Files:** `lua/claudinho/ui/status.lua`, `tests/unit/ui/status_spec.lua`
 - **Depends on:** Task 6
 - **Done when:** a seção 5 está aplicada, com as quatro variantes da largura; `M.text` devolve o mesmo de hoje para os casos da base-ui; os casos de `status_spec` passam, inclusive com `TZ` e `LC_TIME` trocados; gate verde
-- **Status:** pending
+- **Status:** done
 
 ### Task 8 - Modo ao vivo e uso nos POSTs da sessão
 

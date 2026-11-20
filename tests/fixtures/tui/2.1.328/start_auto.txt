@@ -1,0 +1,7 @@
+                                                              ● high · /effort
+────────────────────────────────────────────────────────────────────────────────
+❯ Try "edit init.lua to…"
+────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off - inherited CLAUDE_CODE_CHILD_SESSION marker · r…
+
+  ⏵⏵ auto mode on (shift+tab to cycle) · install gh for PR status

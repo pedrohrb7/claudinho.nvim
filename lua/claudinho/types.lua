@@ -154,6 +154,15 @@
 ---@field tabpage integer|nil
 ---@field hidden_by_diff boolean -- a diff hid the float; only toggle, open or focus bring it back
 
+-- Usage limits read from the status line JSON (lua/claudinho/sources/session_data.lua)
+---@class ClaudinhoUsageWindow
+---@field used number Percentage used, as Claude Code sent it (not rounded, may be above 100)
+---@field resets_at number|nil Epoch seconds of the reset
+
+---@class ClaudinhoRateLimits
+---@field five_hour ClaudinhoUsageWindow|nil
+---@field seven_day ClaudinhoUsageWindow|nil
+
 -- Main module state
 ---@class ClaudinhoState
 ---@field config ClaudinhoConfig

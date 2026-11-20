@@ -1,0 +1,7 @@
+{
+  "rate_limits": {
+    "five_hour": { "used_percentage": "23", "resets_at": 1790000000 },
+    "seven_day": { "used_percentage": 10, "resets_at": "soon" },
+    "spend_limit": { "used_percentage": 5 }
+  }
+}

@@ -1,0 +1,10 @@
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ ctrl+y to paste deleted text ▔
+  Effort
+
+                   Faster                             Smarter
+                   ────────────────────▲─────────────────────
+                   low     medium     high     xhigh      max
+                ~1.5x the estimated cost of medium (the default)
+
+
+  ←/→ to adjust · s to use this session only · Enter to save · Esc to cancel

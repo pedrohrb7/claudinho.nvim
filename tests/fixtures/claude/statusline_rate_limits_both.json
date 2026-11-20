@@ -1,0 +1,9 @@
+{
+  "session_id": "123e4567-e89b-12d3-a456-426614174000",
+  "model": { "id": "claude-opus-5-5", "display_name": "Opus 5.5" },
+  "effort": { "level": "high" },
+  "rate_limits": {
+    "five_hour": { "used_percentage": 23.5, "resets_at": 1790000000 },
+    "seven_day": { "used_percentage": 41.2, "resets_at": 1790400000 }
+  }
+}
